@@ -1,7 +1,6 @@
-from EGG_device1 import EEG
-from EGG_device2 import EEG2
+from EEG_device_plot import EEG
 from bispectrum import bispec
-from timer import timer
+from stopwatch import timer
 
 # Imports for P300
 import multiprocessing
@@ -18,6 +17,7 @@ import os
 from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
+from brainflow.board_shim import BoardIds
 
 # # CODE FOR REAL TIME TEST # #
 
@@ -27,38 +27,51 @@ seconds = Value("i", 0)
 counts = Value("i", 0)
 
 
-# # Define Parallel Processes # #
+# Choose the board ID here, once
+# board_id = BoardIds.ENOPHONE_BOARD.value
+board_id = BoardIds.SYNTHETIC_BOARD.value
 
 
 ###################################################################################################################################################
 if __name__ == '__main__':
     # Access to Manager to share memory between proccesses and acces dataframe's 
     mgr = Manager()
-    #ns = mgr.list()
+
     eno1_datach1 = multiprocessing.Array('d', 800)
     eno1_datach2 = multiprocessing.Array('d', 800)
-
-
     eno2_datach1 = multiprocessing.Array('d', 800)
     eno2_datach2 = multiprocessing.Array('d', 800)
 
-
+    # Write specfic MAC addresses for each device
+    mac1 = "f4:0e:11:75:75:a5"
+    mac2 = "aa:bb:cc:dd:ee:ff"  
 
     # # Define the data folder # #
     # The name of the folder is defined depending on the user's input
-    subject_ID, repetition_num = input('Please enter the subject ID and the number of repetition: ').split(' ')
-    subject_ID = '0' + subject_ID if int(subject_ID) < 10 else subject_ID
-    repetition_num = '0' + repetition_num if int(repetition_num) < 10 else repetition_num
-    folder = 'experimental_results/S{}R{}_{}'.format(subject_ID, repetition_num, datetime.now().strftime("%d%m%Y_%H%M"))
-    os.mkdir(folder)
+
+    while True:
+        try:
+            dyad = int(input("Please write the assigned number for the dyad under analysis: "))
+            break  # exit loop if input is valid
+        except ValueError:
+            print("Invalid input. Please enter a whole number (integer).")
+
+    while True:
+        try:
+            repetition_num = int(input("Enter the iteration number of the current experimental test: "))
+            break
+        except ValueError:
+            print("Invalid input. Please enter a whole number (integer).")
+
+    dyad = f"{dyad:02d}"
+    repetition_num = f"{repetition_num:02d}"
+    folder = f"experimental_results/Dyad{dyad}/R{repetition_num}_{datetime.now():%d%m%Y_%H%M}"
+    os.makedirs(folder, exist_ok=True)
 
 
     for subfolder in ['Raw', 'Processed', 'Figures']:
         os.mkdir('{}/{}'.format(folder, subfolder))
 
-    #Creación de carpetas para datos de Enophones 2
-    for subfolder2 in ['Raw 2', 'Processed 2', 'Figures 2']:
-        os.mkdir('{}/{}'.format(folder, subfolder2))
 
     # # Create a multiprocessing List # # 
     # This list will store the seconds where a beep was played
@@ -66,22 +79,22 @@ if __name__ == '__main__':
 
     # # Start processes # #
 
-    process2 = Process(target=timer, args=[seconds, counts, timestamps])
-    q = Process(target=EEG, args=[seconds, folder, eno1_datach1, eno1_datach2])
-    q2 = Process(target=EEG2, args=[seconds, folder, eno2_datach1, eno2_datach2])
-    q3 = Process(target=bispec, args=[eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, seconds, folder])
+    counter = Process(target=timer, args=[seconds, counts, timestamps])
+    subject1 = Process(target=EEG, args=[seconds, folder, eno1_datach1, eno1_datach2, mac1, "Device_1", board_id])
+    subject2 = Process(target=EEG, args=[seconds, folder, eno2_datach1, eno2_datach2, mac2, "Device_2", board_id])
+    bispectrum = Process(target=bispec, args=[eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, seconds, folder])
 
 
-    process2.start()
-    q.start()
-    q2.start()
-    q3.start()
+    counter.start()
+    subject1.start()
+    subject2.start()
+    bispectrum.start()
 
 
-    process2.join()
-    q.join()
-    q2.join()
-    q3.join()
+    counter.join()
+    subject1.join()
+    subject2.join()
+    bispectrum.join()
 
 
     # # DATA STORAGE SECTION # #
@@ -138,18 +151,6 @@ if __name__ == '__main__':
             # The plot of the processed DataFrame is saved in the "Figures" folder.
             plt.savefig('{}/Figures/{}_plot.png'.format(folder, df_name))
 
-    for df_name2 in os.listdir('{}/Raw 2/'.format(folder)):
-        if df_name2[-4:] == '.csv' and df_name2[:4] != 'file':
-            df_name2 = df_name2[:-4]
-            df_raw2 = pd.read_csv('{}/Raw 2/{}.csv'.format(folder, df_name2), index_col=0)
-            df_processed2 = remove_outliers(df_raw2.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True), 'quantile')
-            
-            # The processed DataFrame is then exported to the "Processed" folder, and plotted.
-            df_processed2.to_csv('{}/Processed 2/{}_processed2.csv'.format(folder, df_name2))
-            df_processed2.plot()
-
-            # The plot of the processed DataFrame is saved in the "Figures" folder.
-            plt.savefig('{}/Figures 2/{}_plot2.png'.format(folder, df_name2))
 
     print(Fore.GREEN + 'Data processed successfully' + Style.RESET_ALL)
 
