@@ -2,7 +2,6 @@ import pandas as pd
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, LogLevels, BoardIds
 from brainflow.data_filter import DataFilter, DetrendOperations
 import time
-from plotting import Graph
 
 # # CODE FOR EEG # #
 def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
@@ -64,8 +63,6 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
             datach2[:800] = lista2[:800]
 
 
-            #Uncomment the line below if you want to se the real time graphics of the preprocessing stage, it may cause problems in code efficiency and shared memory
-            #Graph(board)
             with second.get_lock():
                 # When seconds reach the value, we exit the functions.
                 if(second.value == 21):

@@ -1,6 +1,4 @@
-from EEG_device_plot import EEG
-from bispectrum import bispec
-from stopwatch import timer
+from brain2brain_sync import EEG, bispec, timer
 
 # Imports for P300
 import multiprocessing
