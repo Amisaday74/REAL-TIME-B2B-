@@ -1,21 +1,21 @@
+# Imports from brain2brain_sync module
 from brain2brain_sync import EEG, bispec, timer
 
-# Imports for P300
-import multiprocessing
-from multiprocessing import Process, Value, Manager
+# Imports for multiprocessing and board shim connection
+from multiprocessing import Process, Value, Manager, Array
+from brainflow.board_shim import BoardIds
 
-import numpy as np
-import pandas as pd
-from datetime import datetime
-from colorama import Fore, Style
-import scipy.stats as stats
-
-# Imports for OpenBCI
+# Imports for folders creation and data storage
 import os
 from datetime import datetime
+from colorama import Fore, Style
+
+# Imports for outliers removal and data plotting (no real-time)
+import numpy as np
 import pandas as pd
+import scipy.stats as stats
 import matplotlib.pyplot as plt
-from brainflow.board_shim import BoardIds
+
 
 # # CODE FOR REAL TIME TEST # #
 
@@ -35,10 +35,10 @@ if __name__ == '__main__':
     # Access to Manager to share memory between proccesses and acces dataframe's 
     mgr = Manager()
 
-    eno1_datach1 = multiprocessing.Array('d', 800)
-    eno1_datach2 = multiprocessing.Array('d', 800)
-    eno2_datach1 = multiprocessing.Array('d', 800)
-    eno2_datach2 = multiprocessing.Array('d', 800)
+    eno1_datach1 = Array('d', 800)
+    eno1_datach2 = Array('d', 800)
+    eno2_datach1 = Array('d', 800)
+    eno2_datach2 = Array('d', 800)
 
     # Write specfic MAC addresses for each device
     mac1 = "f4:0e:11:75:75:a5"
@@ -70,24 +70,19 @@ if __name__ == '__main__':
     for subfolder in ['Real_Time_Data', 'Processed', 'Figures']:
         os.mkdir('{}/{}'.format(folder, subfolder))
 
-
     # # Create a multiprocessing List # # 
-    # This list will store the seconds where a beep was played
-    timestamps = multiprocessing.Manager().list()
+    timestamps = Manager().list()
 
     # # Start processes # #
-
     counter = Process(target=timer, args=[seconds, counts, timestamps])
     subject1 = Process(target=EEG, args=[seconds, folder, eno1_datach1, eno1_datach2, mac1, "Device_1", board_id])
     subject2 = Process(target=EEG, args=[seconds, folder, eno2_datach1, eno2_datach2, mac2, "Device_2", board_id])
     bispectrum = Process(target=bispec, args=[eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, seconds, folder])
 
-
     counter.start()
     subject1.start()
     subject2.start()
     bispectrum.start()
-
 
     counter.join()
     subject1.join()
@@ -97,15 +92,14 @@ if __name__ == '__main__':
 
     # # DATA STORAGE SECTION # #
     # Executed only once the test has finished.
-
-    print(Fore.RED + 'Test finished sucessfully, storing data now...' + Style.RESET_ALL)
-
-
-    print(Fore.GREEN + 'Data stored sucessfully' + Style.RESET_ALL)
+    print(Fore.RED + 'Test finished successfully, storing data now...' + Style.RESET_ALL)
+    print(Fore.GREEN + 'Data stored successfully' + Style.RESET_ALL)
 
     # # Data processing # #
     print(Fore.RED + 'Data being processed...' + Style.RESET_ALL)
 
+
+    # # POST REAL-TIME OUTLIERS REMOVAL SECTION # #
     def remove_outliers(df, method):
         """
         Uses an statistical method to remove outlier rows from the dataset x, and filters the valid rows back to y.
@@ -135,7 +129,6 @@ if __name__ == '__main__':
         return df
     
     # The following for loop iterates over all features, and removes outliers depending on the statistical method used.
-    # It reads the files saved in the "Raw" folder, and only reads .CSV files, to outputt a .CSV file in "Processed" folder.
     for df_name in os.listdir('{}/Real_Time_Data/'.format(folder)):
         if df_name[-4:] == '.csv' and df_name[:4] != 'file':
             df_name = df_name[:-4]
@@ -152,24 +145,17 @@ if __name__ == '__main__':
 
     print(Fore.GREEN + 'Data processed successfully' + Style.RESET_ALL)
 
-                        #Create dataframes to estimate the eyes open mean matrix
 
+    # # POST REAL-TIME BISPECTRUM PLOTS SECTION # #
+    #Create dataframes for bispectrum results
     data_meanb = pd.read_csv('{}/Frequency_bands_bispectrum.csv'.format(folder), index_col=0)
     data_graph = data_meanb.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True)
-
-                            #matrix = pd.DataFrame(arrange3).transpose()
-    #arrange3.to_csv('{}/Calibration_data_clean.csv'.format(folder))
-
-                          
-    #eyes_open = pd.read_csv('{}/Calibration_data_clean.csv'.format(folder), index_col=0)
                         
     df_graph = pd.DataFrame(data_graph)
     # Replace -inf and inf with 0 in your DataFrame
     data_graph = data_graph.replace([float('-inf'), float('inf')], 0)
     print(df_graph)
 
-"""
-    # Assuming data_graph is your DataFrame
     # Generate a time index from 0 to 420 seconds with the same length as your DataFrame
     time_index = np.linspace(0, 180, len(data_graph))
     print(seconds)
@@ -192,7 +178,3 @@ if __name__ == '__main__':
 # For suffle of array, check the next link and user "mdml" answer:
 # https://stackoverflow.com/questions/19597473/binary-random-array-with-a-specific-proportion-of-ones
 
-
-
-#python Empatica-Project-ALAS-main/files/final_bispec.py
-"""
