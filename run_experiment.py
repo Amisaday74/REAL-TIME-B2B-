@@ -67,7 +67,7 @@ if __name__ == '__main__':
     os.makedirs(folder, exist_ok=True)
 
 
-    for subfolder in ['Raw', 'Processed', 'Figures']:
+    for subfolder in ['Real_Time_Data', 'Processed', 'Figures']:
         os.mkdir('{}/{}'.format(folder, subfolder))
 
 
@@ -136,10 +136,10 @@ if __name__ == '__main__':
     
     # The following for loop iterates over all features, and removes outliers depending on the statistical method used.
     # It reads the files saved in the "Raw" folder, and only reads .CSV files, to outputt a .CSV file in "Processed" folder.
-    for df_name in os.listdir('{}/Raw/'.format(folder)):
+    for df_name in os.listdir('{}/Real_Time_Data/'.format(folder)):
         if df_name[-4:] == '.csv' and df_name[:4] != 'file':
             df_name = df_name[:-4]
-            df_raw = pd.read_csv('{}/Raw/{}.csv'.format(folder, df_name), index_col=0)
+            df_raw = pd.read_csv('{}/Real_Time_Data/{}.csv'.format(folder, df_name), index_col=0)
             df_processed = remove_outliers(df_raw.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True), 'quantile')
             
             # The processed DataFrame is then exported to the "Processed" folder, and plotted.
