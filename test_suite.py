@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 from brainflow import BoardShim, BrainFlowInputParams, BoardIds
-from improvement import Graph, main
+from real_time_plotting import Graph, main
 import time
 
 
