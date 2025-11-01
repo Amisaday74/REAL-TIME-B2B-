@@ -2,7 +2,6 @@ import pandas as pd
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, LogLevels, BoardIds
 from brainflow.data_filter import DataFilter, DetrendOperations
 import time
-from plotting import Graph
 
 # # CODE FOR EEG # #
 def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
@@ -31,13 +30,13 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
 
             ############## Data collection #################
             # Empty DataFrames are created for raw data.
-            df_crudas = pd.DataFrame(columns=['MV' + str(channel) for channel in range(1, len(eeg_channels) + 1)])
-            signal = pd.DataFrame(columns=['CH' + str(channel) for channel in range(1, len(eeg_channels) + 1)])
+            df_signal = pd.DataFrame(columns=['MV' + str(channel) for channel in range(1, len(eeg_channels) + 1)])
+            df_crudas = pd.DataFrame(columns=['CH' + str(channel) for channel in range(1, len(eeg_channels) + 1)])
             
             # The total number of EEG channels is looped to obtain MV for each channel, and
             # thus saved it on the corresponding columns of the respective DataFrame.
             for eeg_channel in eeg_channels:
-                signal['CH' + str(eeg_channel)] = data[eeg_channel]
+                df_crudas['CH' + str(eeg_channel)] = data[eeg_channel]
                 DataFilter.detrend(data[eeg_channel], DetrendOperations.LINEAR.value)
                 ####################START OF PREPROCESING#############################
                 #Filter for envirionmental noise (Notch: 0=50Hz 1=60Hz)
@@ -45,15 +44,15 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
                 #Bandpass Filter
                 DataFilter.perform_lowpass(data[eeg_channel], sampling_rate, cutoff=100, order=4, filter_type=0, ripple=0)
                 DataFilter.perform_highpass(data[eeg_channel], sampling_rate, cutoff=0.1, order=4, filter_type=0, ripple=0)      
-                df_crudas['MV' + str(eeg_channel)] = data[eeg_channel]
+                df_signal['MV' + str(eeg_channel)] = data[eeg_channel]
             
-            signal.to_csv(f'{folder}/Raw/{device_name}_Testing.csv', mode='a')
-            df_crudas.to_csv(f'{folder}/Raw/{device_name}_Crudas.csv', mode='a')
+            df_crudas.to_csv(f'{folder}/Real_Time_Data/{device_name}_raw_data.csv', mode='a')
+            df_signal.to_csv(f'{folder}/Real_Time_Data/{device_name}_signal_processing.csv', mode='a')
             
             # Calculate the new variable based on the formula
             referenced_electrodes = pd.DataFrame()
-            referenced_electrodes['referenced_electrode1'] = df_crudas['MV3'] - ((df_crudas['MV1'] + df_crudas['MV2']) / 2)
-            referenced_electrodes['referenced_electrode2'] = df_crudas['MV4'] - ((df_crudas['MV1'] + df_crudas['MV2']) / 2)
+            referenced_electrodes['referenced_electrode1'] = df_signal['MV3'] - ((df_signal['MV1'] + df_signal['MV2']) / 2)
+            referenced_electrodes['referenced_electrode2'] = df_signal['MV4'] - ((df_signal['MV1'] + df_signal['MV2']) / 2)
 
             # Both raw and PSD DataFrame is exported as a CSV.
             arrange=referenced_electrodes.to_dict('dict')
@@ -64,8 +63,6 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
             datach2[:800] = lista2[:800]
 
 
-            #Uncomment the line below if you want to se the real time graphics of the preprocessing stage, it may cause problems in code efficiency and shared memory
-            #Graph(board)
             with second.get_lock():
                 # When seconds reach the value, we exit the functions.
                 if(second.value == 21):
