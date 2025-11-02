@@ -8,7 +8,8 @@ import sys
 
 # ------------------- Graph Class with QThread ------------------- #
 class Graph(QtCore.QThread):
-    data_signal = QtCore.pyqtSignal(object)  # Signal to receive data
+    data_signal = QtCore.pyqtSignal(object)  # Signal to receive raw data
+    processed_data = QtCore.pyqtSignal(object)  # Signal to receive processed data
     close_signal = QtCore.pyqtSignal()       # Signal to handle closing
 
     def __init__(self, eeg_channels, sampling_rate):
@@ -20,12 +21,14 @@ class Graph(QtCore.QThread):
         self.running = True
 
         # Initialize the application and plot window
-        self.app = QtWidgets.QApplication(sys.argv)
+        self.app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
         self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data (Board 1)")
         self._init_timeseries()
+        self._init_processed()
 
         # Start listening for data signals
         self.data_signal.connect(self.update_plot)
+        self.processed_data.connect(self.update_processed)
         self.close_signal.connect(self.close_app)
         self.start()
 
@@ -45,12 +48,38 @@ class Graph(QtCore.QThread):
             curve = p.plot()
             self.curves.append(curve)
 
+    #Plot for processed data
+    def _init_processed(self):
+        self.plots2 = []
+        self.curves2 = []
+        for i in range(len(self.eeg_channels)):
+            p2 = self.win.addPlot(row=i, col=1)
+            p2.showAxis('left', False)
+            p2.setMenuEnabled('left', False)
+            p2.showAxis('bottom', False)
+            p2.setMenuEnabled('bottom', False)
+            if i == 0:
+                p2.setTitle('Processed Signal')
+            self.plots2.append(p2)
+            curve2 = p2.plot()
+            self.curves2.append(curve2) 
+
     @QtCore.pyqtSlot(object)
     def update_plot(self, data):
         """Update plot with new data."""
         for count, channel in enumerate(self.eeg_channels):
             self.curves[count].setData(data[channel].tolist())
         self.app.processEvents()
+
+    @QtCore.pyqtSlot(object)
+    def update_processed(self, data):
+        """Update plot with processed data."""
+        for count, channel in enumerate(self.eeg_channels):
+            self.curves2[count].setData(data[channel].tolist())
+            #if count < data.shape[1]:  # Ensure we don't go out of bounds
+                #self.curves2[count].setData(data[:, count].tolist())
+        self.app.processEvents()
+        
 
     @QtCore.pyqtSlot()
     def close_app(self):
@@ -76,18 +105,21 @@ def main():
     graph = Graph(eeg_channels, sampling_rate)
 
     while True:
-        time.sleep(4)  # 4-second window
+        time.sleep(1)  # 4-second window
         data = board.get_board_data()  
-
+        graph.data_signal.emit(data)
+        # make a copy for processing
+        processed_data = data.copy()
+        
         # Preprocessing
         for eeg_channel in eeg_channels:
-            DataFilter.detrend(data[eeg_channel], DetrendOperations.LINEAR.value)
-            DataFilter.remove_environmental_noise(data[eeg_channel], sampling_rate, noise_type=1)
-            DataFilter.perform_lowpass(data[eeg_channel], sampling_rate, cutoff=100, order=4, filter_type=0, ripple=0)
-            DataFilter.perform_highpass(data[eeg_channel], sampling_rate, cutoff=0.1, order=4, filter_type=0, ripple=0)
+            DataFilter.detrend(processed_data[eeg_channel], DetrendOperations.LINEAR.value)
+            DataFilter.remove_environmental_noise(processed_data[eeg_channel], sampling_rate, noise_type=1)
+            DataFilter.perform_lowpass(processed_data[eeg_channel], sampling_rate, cutoff=40, order=4, filter_type=0, ripple=0)
+            DataFilter.perform_highpass(processed_data[eeg_channel], sampling_rate, cutoff=0.1, order=4, filter_type=0, ripple=0)
 
         # Send data to the graph in the background
-        graph.data_signal.emit(data)
+        graph.processed_data.emit(processed_data)
 
 if __name__ == "__main__":
     main()
