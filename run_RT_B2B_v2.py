@@ -155,7 +155,7 @@ if __name__ == '__main__':
     # Replace -inf and inf with 0 in your DataFrame
     data_graph = data_graph.replace([float('-inf'), float('inf')], 0)
     print(df_graph)
-
+'''
     # Generate a time index from 0 to 420 seconds with the same length as your DataFrame
     time_index = np.linspace(0, 180, len(data_graph))
     print(seconds)
@@ -170,7 +170,7 @@ if __name__ == '__main__':
         plt.grid(True)
         plt.savefig(f'{folder}/Figures/{column}_plot.png')
         plt.show()
-
+'''
 
 ####### Sources ########
 # To understand Value data type and lock method read the following link:
