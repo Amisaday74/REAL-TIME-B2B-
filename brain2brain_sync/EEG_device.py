@@ -2,7 +2,7 @@ import pandas as pd
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, LogLevels, BoardIds
 from brainflow.data_filter import DataFilter, DetrendOperations
 import time
-from signal_plotting import Graph
+from graphs import Graph
 
 # # CODE FOR EEG # #
 def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
