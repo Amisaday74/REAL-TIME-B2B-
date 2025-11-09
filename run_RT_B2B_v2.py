@@ -1,9 +1,9 @@
 # Imports from brain2brain_sync module
-from brain2brain_sync import EEG, bispec, timer
+from brain2brain_sync import EEG, bispec, timer, Graph
 
 # Imports for multiprocessing and board shim connection
-from multiprocessing import Process, Value, Manager, Array
-from brainflow.board_shim import BoardIds
+from multiprocessing import Process, Value, Manager, Array, Queue
+from brainflow.board_shim import BoardIds, BoardShim
 
 # Imports for folders creation and data storage
 import os
@@ -15,6 +15,10 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import matplotlib.pyplot as plt
+
+from PyQt5 import QtWidgets, QtCore
+import sys
+import threading
 
 
 # # CODE FOR REAL TIME TEST # #
@@ -28,7 +32,31 @@ counts = Value("i", 0)
 # Choose the board ID here, once
 # board_id = BoardIds.ENOPHONE_BOARD.value
 board_id = BoardIds.SYNTHETIC_BOARD.value
+eeg_channels = BoardShim.get_eeg_channels(board_id)
+sampling_rate = BoardShim.get_sampling_rate(board_id)
+print(f'EEG Channels: {eeg_channels}, Sampling Rate: {sampling_rate}')
 
+def poll_queues(graph, queues):
+    for q in queues:
+        while not q.empty():
+            device, raw, processed = q.get()
+            if graph.running:
+                graph.data_signal.emit(raw)
+                graph.processed_data.emit(processed)
+
+def run_graph(eeg_channels, sampling_rate, q1, q2, graph_closed):
+    """Run the PyQt graph in its own thread."""
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+    graph = Graph(eeg_channels, sampling_rate)
+
+    # poll queues every 100 ms
+    timer = QtCore.QTimer()
+    timer.timeout.connect(lambda: poll_queues(graph, [q1, q2]))
+    timer.start(100)
+
+    app.exec_()
+    graph_closed.set()  #Notify the main thread that the graph is closed
+    print("Graph window closed — GUI stopped.")
 
 ###################################################################################################################################################
 if __name__ == '__main__':
@@ -73,16 +101,37 @@ if __name__ == '__main__':
     # # Create a multiprocessing List # # 
     timestamps = Manager().list()
 
+    q1 = Queue()
+    q2 = Queue()
+    graph_closed = threading.Event()
+
     # # Start processes # #
     counter = Process(target=timer, args=[seconds, counts, timestamps])
-    subject1 = Process(target=EEG, args=[seconds, folder, eno1_datach1, eno1_datach2, mac1, "Device_1", board_id])
-    subject2 = Process(target=EEG, args=[seconds, folder, eno2_datach1, eno2_datach2, mac2, "Device_2", board_id])
+    subject1 = Process(target=EEG, args=[seconds, folder, eno1_datach1, eno1_datach2, mac1, "Device_1", board_id, q1])
+    subject2 = Process(target=EEG, args=[seconds, folder, eno2_datach1, eno2_datach2, mac2, "Device_2", board_id, q2])
     bispectrum = Process(target=bispec, args=[eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, seconds, folder])
 
     counter.start()
     subject1.start()
     subject2.start()
     bispectrum.start()
+
+    # Launch graph (non-blocking)
+    graph_thread = threading.Thread(target=run_graph, args=(eeg_channels, sampling_rate, q1, q2, graph_closed))
+    graph_thread.daemon = True
+    graph_thread.start()
+
+    # Keep polling status while any worker is alive
+    workers = [counter, subject1, subject2, bispectrum]
+    while any(p.is_alive() for p in workers):
+        # If the graph was closed manually, we simply stop expecting GUI updates.
+        if graph_closed.is_set():
+            # Informational message only
+            print("Graph closed by user; acquisition processes will continue until they finish.")
+            # Optionally, you can join with timeout to periodically print status
+            for p in workers:
+                p.join(timeout=1.0)  # wait up to 1s each loop iteration
+    # All workers finished
 
     counter.join()
     subject1.join()

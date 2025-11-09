@@ -21,7 +21,7 @@ class Graph(QtCore.QThread):
         self.running = True
 
         # Initialize the application and plot window
-        self.app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+        #self.app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
         self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data (Board 1)")
         self._init_timeseries()
         self._init_processed()
@@ -69,7 +69,7 @@ class Graph(QtCore.QThread):
         """Update plot with new data."""
         for count, channel in enumerate(self.eeg_channels):
             self.curves[count].setData(data[channel].tolist())
-        self.app.processEvents()
+        QtWidgets.QApplication.processEvents()
 
     @QtCore.pyqtSlot(object)
     def update_processed(self, data):
@@ -78,14 +78,18 @@ class Graph(QtCore.QThread):
             self.curves2[count].setData(data[channel].tolist())
             #if count < data.shape[1]:  # Ensure we don't go out of bounds
                 #self.curves2[count].setData(data[:, count].tolist())
-        self.app.processEvents()
+        QtWidgets.QApplication.processEvents()
         
 
     @QtCore.pyqtSlot()
     def close_app(self):
         """Handle graceful shutdown of the graph window only."""
         self.running = False     # stop emitting to the graph
-        self.app.quit()          # close Qt event loop
+        # Make sure timers and plots stop updating
+        for plot in self.plots + getattr(self, 'plots2', []):
+            plot.clear()
+        # Quit the event loop (this will end app.exec_())
+        QtCore.QTimer.singleShot(0, self.app.quit)
 
 # ------------------- Main Data Collection Loop ------------------- #
 def main():

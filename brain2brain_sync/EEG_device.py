@@ -5,7 +5,7 @@ import time
 from .graphs import Graph
 
 # # CODE FOR EEG # #
-def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
+def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, queue):
     # The following object will save parameters to connect with the EEG.
     BoardShim.enable_dev_board_logger()
     params = BrainFlowInputParams()
@@ -25,7 +25,7 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
     BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- Starting the streaming with {device_name} ---')
 
     # Initialize the Graph in a separate thread
-    graph = Graph(eeg_channels, sampling_rate)
+    # graph = Graph(eeg_channels, sampling_rate)
 
     try:
         while (True):
@@ -56,9 +56,7 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
             df_signal.to_csv(f'{folder}/Real_Time_Data/{device_name}_signal_processing.csv', mode='a')
 
             # Send data to the graph in the background if it is still open
-            if graph.running:
-                graph.data_signal.emit(raw_data)
-                graph.processed_data.emit(data)
+            queue.put((device_name, raw_data, data))
             
             # Calculate the new variable based on the formula
             referenced_electrodes = pd.DataFrame()
@@ -78,17 +76,12 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id):
                 # When seconds reach the value, we exit the functions.
                 if(second.value == 21):
                     BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- End the session with {device_name} ---')
-                    graph.close_signal.emit()
                     break  # exit loop
 
     except KeyboardInterrupt:
         BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- Interrupted, ending session with {device_name} ---')
-        graph.close_signal.emit()
 
     finally:
-        try:
-            board.stop_stream()
-        except Exception:
-            pass  # already stopped
+        board.stop_stream()
         board.release_session()
         BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- Session released for {device_name} ---')
