@@ -36,13 +36,33 @@ eeg_channels = BoardShim.get_eeg_channels(board_id)
 sampling_rate = BoardShim.get_sampling_rate(board_id)
 print(f'EEG Channels: {eeg_channels}, Sampling Rate: {sampling_rate}')
 
+# ---------------------- QUEUE POLLING ------------------------
 def poll_queues(graph, queues):
+    """Forward queue data into the Graph safely."""
+    if not graph.running:
+        return
     for q in queues:
         while not q.empty():
             device, raw, processed = q.get()
-            if graph.running:
-                graph.data_signal.emit(raw)
-                graph.processed_data.emit(processed)
+            graph.data_signal.emit(raw)
+            graph.processed_data.emit(processed)
+
+
+def run_graph(eeg_channels, sampling_rate, q1, q2):
+    """Run GUI in a dedicated non-blocking thread."""
+    
+    app = QtWidgets.QApplication([])
+    graph = Graph(eeg_channels, sampling_rate)
+
+    # poll queues every 100 ms
+    timer = QtCore.QTimer()
+    timer.timeout.connect(lambda: poll_queues(graph, [q1, q2]))
+    timer.start(100)
+
+    # NEVER BLOCK — use exec_, but inside a thread that the main thread never waits on
+    app.exec_()
+
+    print("[GUI] Graph thread ended (only when process finishes).")
 
 
 ###################################################################################################################################################
@@ -90,7 +110,6 @@ if __name__ == '__main__':
 
     q1 = Queue()
     q2 = Queue()
-    graph_closed = threading.Event()
 
     # # Start processes # #
     counter = Process(target=timer, args=[seconds, counts, timestamps])
@@ -103,30 +122,13 @@ if __name__ == '__main__':
     subject2.start()
     bispectrum.start()
 
-    # -----------------------------------------------------------
-    # Qt GUI runs in main thread (no warning, responsive)
-    # -----------------------------------------------------------
-    app = QtWidgets.QApplication(sys.argv)
-    graph = Graph(eeg_channels, sampling_rate)
-
-    # Poll incoming data from queues every 100 ms
-    q_timer = QtCore.QTimer()
-    q_timer.timeout.connect(lambda: poll_queues(graph, [q1, q2]))
-    q_timer.start(100)
-
-    # Monitor subprocesses; close GUI when all are done
-    def check_workers():
-        alive = any(p.is_alive() for p in [counter, subject1, subject2, bispectrum])
-        if not alive:
-            print("All processes finished — closing GUI.")
-            graph.close_app()          # emits quit on QApplication
-    monitor_timer = QtCore.QTimer()
-    monitor_timer.timeout.connect(check_workers)
-    monitor_timer.start(500)
-
-    # Start Qt event loop (blocking but responsive)
-    app.exec_()
-    print("Graph window closed — continuing post-processing.")
+    # ---------------------- GUI THREAD (non-blocking) ----------
+    gui_thread = threading.Thread(
+        target=run_graph,
+        args=(eeg_channels, sampling_rate, q1, q2),
+        daemon=True
+    )
+    gui_thread.start()
 
     counter.join()
     subject1.join()

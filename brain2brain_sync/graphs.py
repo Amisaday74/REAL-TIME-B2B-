@@ -8,8 +8,8 @@ import sys
 
 # ------------------- Graph Class with QThread ------------------- #
 class Graph(QtCore.QThread):
-    data_signal = QtCore.pyqtSignal(object)  # Signal to receive raw data
-    processed_data = QtCore.pyqtSignal(object)  # Signal to receive processed data
+    data_signal = QtCore.pyqtSignal(object)       # raw data
+    processed_data = QtCore.pyqtSignal(object)    # processed data
 
     def __init__(self, eeg_channels, sampling_rate):
         super().__init__()
@@ -17,93 +17,80 @@ class Graph(QtCore.QThread):
         self.sampling_rate = sampling_rate
         self.window_size = 4
         self.num_points = self.window_size * self.sampling_rate
-        self.running = True
 
-        # Initialize the application and plot window
-        self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data (Board 1)")
+        self.running = True   # plot enabled/disabled
+
+        # ---------------- GUI WINDOW ----------------
+        self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data")
+        self.win.closeEvent = self._handle_close_event  # intercept close()
+
         self._init_timeseries()
         self._init_processed()
 
-        # Start listening for data signals
+        # ---------------- SIGNAL CONNECTIONS ----------------
         self.data_signal.connect(self.update_plot)
         self.processed_data.connect(self.update_processed)
 
-
+    # ---------------- PLOTS ----------------
     def _init_timeseries(self):
-        """Initialize the time series plots for each EEG channel."""
         self.plots = []
         self.curves = []
-        for i in range(len(self.eeg_channels)):
-            p = self.win.addPlot(row=i, col=0)
+        for idx, ch in enumerate(self.eeg_channels):
+            p = self.win.addPlot(row=idx, col=0)
             p.showAxis('left', False)
-            p.setMenuEnabled('left', False)
             p.showAxis('bottom', False)
-            p.setMenuEnabled('bottom', False)
-            if i == 0:
-                p.setTitle('EEG Raw Data')
-            self.plots.append(p)
+            if idx == 0:
+                p.setTitle("EEG Raw Data")
             curve = p.plot()
+            self.plots.append(p)
             self.curves.append(curve)
 
-    #Plot for processed data
     def _init_processed(self):
         self.plots2 = []
         self.curves2 = []
-        for i in range(len(self.eeg_channels)):
-            p2 = self.win.addPlot(row=i, col=1)
+        for idx, ch in enumerate(self.eeg_channels):
+            p2 = self.win.addPlot(row=idx, col=1)
             p2.showAxis('left', False)
-            p2.setMenuEnabled('left', False)
             p2.showAxis('bottom', False)
-            p2.setMenuEnabled('bottom', False)
-            if i == 0:
-                p2.setTitle('Processed Signal')
-            self.plots2.append(p2)
+            if idx == 0:
+                p2.setTitle("Processed Signal")
             curve2 = p2.plot()
-            self.curves2.append(curve2) 
+            self.plots2.append(p2)
+            self.curves2.append(curve2)
 
+    # ---------------- UPDATE RAW ----------------
     @QtCore.pyqtSlot(object)
     def update_plot(self, data):
-        """Update plot with new data."""
-        for count, channel in enumerate(self.eeg_channels):
-            self.curves[count].setData(data[channel].tolist())
+        if not self.running:
+            return
+        for idx, ch in enumerate(self.eeg_channels):
+            self.curves[idx].setData(data[ch].tolist())
         QtWidgets.QApplication.processEvents()
 
+    # ---------------- UPDATE PROCESSED ----------------
     @QtCore.pyqtSlot(object)
     def update_processed(self, data):
-        """Update plot with processed data."""
-        for count, channel in enumerate(self.eeg_channels):
-            self.curves2[count].setData(data[channel].tolist())
-            #if count < data.shape[1]:  # Ensure we don't go out of bounds
-                #self.curves2[count].setData(data[:, count].tolist())
+        if not self.running:
+            return
+        for idx, ch in enumerate(self.eeg_channels):
+            self.curves2[idx].setData(data[ch].tolist())
         QtWidgets.QApplication.processEvents()
-        
 
     # -----------------------------------------------------------
-    # Handle close events (user closes window)
+    # CLOSE EVENT OVERRIDE → hide instead of destroying window
     # -----------------------------------------------------------
-    def closeEvent(self, event):
-        """Called automatically when the window is closed."""
-        print("[Graph] Window closed by user — GUI will stop, acquisition continues.")
-        self.running = False
-        QtCore.QTimer.singleShot(100, self.app_quit)  # Quit Qt after a short delay
-        event.accept()
+    def _handle_close_event(self, event):
+        """
+        The user clicks the window X button.
+        → DO NOT close the app
+        → DO NOT quit Qt
+        → Simply hide the window and pause plotting
+        """
+        print("[Graph] Window hidden — acquisition continues.")
 
-    # -----------------------------------------------------------
-    # Public close method (for programmatic shutdown)
-    # -----------------------------------------------------------
-    @QtCore.pyqtSlot()
-    def close_app(self):
-        """Called from outside when we want to close GUI gracefully."""
-        if self.running:
-            print("[Graph] Close requested programmatically — stopping GUI.")
-            self.running = False
-            QtCore.QTimer.singleShot(100, self.app_quit)
-
-    def app_quit(self):
-        """Internal helper to quit the app safely."""
-        app = QtWidgets.QApplication.instance()
-        if app:
-            app.quit()
+        self.running = False   # pause plotting
+        self.win.hide()        # hide GUI window
+        event.ignore()         # prevent object destruction
 # ------------------- Main Data Collection Loop ------------------- #
 def main():
     BoardShim.enable_dev_board_logger()
