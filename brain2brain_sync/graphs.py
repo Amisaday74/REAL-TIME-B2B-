@@ -23,6 +23,17 @@ class Graph(QtCore.QThread):
         # Initialize the application and plot window
         self.app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
         self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data (Board 1)")
+
+        # Prevent the user from closing the window manually:
+        # - remove the close button from the window frame
+        # - install an event filter to intercept and ignore Close events
+        try:
+            self.win.setWindowFlag(QtCore.Qt.WindowCloseButtonHint, False)
+            # re-show to apply the changed flags
+            self.win.show()
+        except Exception:
+            pass
+        self.win.installEventFilter(self)
         self._init_timeseries()
         self._init_processed()
 
@@ -84,8 +95,27 @@ class Graph(QtCore.QThread):
     @QtCore.pyqtSlot()
     def close_app(self):
         """Handle graceful shutdown of the graph window only."""
+        # Full, controlled shutdown initiated by controller script.
         self.running = False     # stop emitting to the graph
-        self.app.quit()          # close Qt event loop
+        try:
+            self.app.quit()          # close Qt event loop
+        except Exception:
+            pass
+
+    def eventFilter(self, obj, event):
+        """Intercept `Close` events on `self.win` and block them.
+
+        The controlling script should call `graph.close_signal.emit()` or
+        `graph.close_app()` to perform a controlled shutdown.
+        """
+        if obj is getattr(self, 'win', None) and event.type() == QtCore.QEvent.Close:
+            print('[Graph] Manual close blocked — use controller to shutdown.')
+            try:
+                event.ignore()
+            except Exception:
+                pass
+            return True
+        return super().eventFilter(obj, event)
 
 # ------------------- Main Data Collection Loop ------------------- #
 def main():
