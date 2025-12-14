@@ -34,7 +34,6 @@ counts = Value("i", 0)
 board_id = BoardIds.SYNTHETIC_BOARD.value
 eeg_channels = BoardShim.get_eeg_channels(board_id)
 sampling_rate = BoardShim.get_sampling_rate(board_id)
-print(f'EEG Channels: {eeg_channels}, Sampling Rate: {sampling_rate}')
 
 # ---------------------- QUEUE POLLING ------------------------
 def poll_queues(graph, queues):
