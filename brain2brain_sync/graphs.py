@@ -1,10 +1,8 @@
 from PyQt5 import QtWidgets, QtCore
 import pyqtgraph as pg
 from brainflow import BoardShim, DataFilter, DetrendOperations
-from brainflow.board_shim import BrainFlowInputParams, BoardIds, LogLevels
-import pandas as pd
+from brainflow.board_shim import BrainFlowInputParams, BoardIds
 import time
-import sys
 
 # ------------------- Graph Class with QThread ------------------- #
 class Graph(QtCore.QThread):
@@ -21,6 +19,16 @@ class Graph(QtCore.QThread):
 
         # Initialize the application and plot window
         self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data (Board 1)")
+        # Prevent the user from closing the window manually:
+        # - remove the close button from the window frame
+        # - install an event filter to intercept and ignore Close events
+        try:
+            self.win.setWindowFlag(QtCore.Qt.WindowCloseButtonHint, False)
+            # re-show to apply the changed flags
+            self.win.show()
+        except Exception:
+            pass
+        self.win.installEventFilter(self)
         self._init_timeseries()
         self._init_processed()
 
@@ -73,8 +81,6 @@ class Graph(QtCore.QThread):
         """Update plot with processed data."""
         for count, channel in enumerate(self.eeg_channels):
             self.curves2[count].setData(data[channel].tolist())
-            #if count < data.shape[1]:  # Ensure we don't go out of bounds
-                #self.curves2[count].setData(data[:, count].tolist())
         QtWidgets.QApplication.processEvents()
         
 
@@ -104,6 +110,21 @@ class Graph(QtCore.QThread):
         app = QtWidgets.QApplication.instance()
         if app:
             app.quit()
+
+    def eventFilter(self, obj, event):
+        """Intercept `Close` events on `self.win` and block them.
+
+        The controlling script should call `graph.close_signal.emit()` or
+        `graph.close_app()` to perform a controlled shutdown.
+        """
+        if obj is getattr(self, 'win', None) and event.type() == QtCore.QEvent.Close:
+            print('[Graph] Manual close blocked — use controller to shutdown.')
+            try:
+                event.ignore()
+            except Exception:
+                pass
+            return True
+        return super().eventFilter(obj, event)
 # ------------------- Main Data Collection Loop ------------------- #
 def main():
     BoardShim.enable_dev_board_logger()
