@@ -10,7 +10,6 @@ import sys
 class Graph(QtCore.QThread):
     data_signal = QtCore.pyqtSignal(object)  # Signal to receive raw data
     processed_data = QtCore.pyqtSignal(object)  # Signal to receive processed data
-    close_signal = QtCore.pyqtSignal()       # Signal to handle closing
 
     def __init__(self, eeg_channels, sampling_rate):
         super().__init__()
@@ -21,7 +20,6 @@ class Graph(QtCore.QThread):
         self.running = True
 
         # Initialize the application and plot window
-        self.app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
         self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data (Board 1)")
 
         # Prevent the user from closing the window manually:
@@ -40,8 +38,6 @@ class Graph(QtCore.QThread):
         # Start listening for data signals
         self.data_signal.connect(self.update_plot)
         self.processed_data.connect(self.update_processed)
-        self.close_signal.connect(self.close_app)
-        self.start()
 
     def _init_timeseries(self):
         """Initialize the time series plots for each EEG channel."""
@@ -87,20 +83,22 @@ class Graph(QtCore.QThread):
         """Update plot with processed data."""
         for count, channel in enumerate(self.eeg_channels):
             self.curves2[count].setData(data[channel].tolist())
-            #if count < data.shape[1]:  # Ensure we don't go out of bounds
-                #self.curves2[count].setData(data[:, count].tolist())
         self.app.processEvents()
         
 
     @QtCore.pyqtSlot()
     def close_app(self):
-        """Handle graceful shutdown of the graph window only."""
-        # Full, controlled shutdown initiated by controller script.
-        self.running = False     # stop emitting to the graph
-        try:
-            self.app.quit()          # close Qt event loop
-        except Exception:
-            pass
+        """Called from outside when we want to close GUI gracefully."""
+        if self.running:
+            print("[Graph] Close requested programmatically — stopping GUI.")
+            self.running = False
+            QtCore.QTimer.singleShot(100, self.app_quit)
+
+    def app_quit(self):
+        """Internal helper to quit the app safely."""
+        app = QtWidgets.QApplication.instance()
+        if app:
+            app.quit()
 
     def eventFilter(self, obj, event):
         """Intercept `Close` events on `self.win` and block them.
