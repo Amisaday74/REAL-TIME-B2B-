@@ -6,8 +6,8 @@ import time
 
 # ------------------- Graph Class with QThread ------------------- #
 class Graph(QtCore.QThread):
-    data_signal = QtCore.pyqtSignal(object)       # raw data
-    processed_data = QtCore.pyqtSignal(object)    # processed data
+    data_signal = QtCore.pyqtSignal(object)  # Signal to receive raw data
+    processed_data = QtCore.pyqtSignal(object)  # Signal to receive processed data
 
     def __init__(self, eeg_channels, sampling_rate):
         super().__init__()
@@ -15,11 +15,10 @@ class Graph(QtCore.QThread):
         self.sampling_rate = sampling_rate
         self.window_size = 4
         self.num_points = self.window_size * self.sampling_rate
-
-        self.running = True   # plot enabled/disabled
+        self.running = True
 
         # Initialize the application and plot window
-        self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data (Board 1)")
+        self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data")
         # Prevent the user from closing the window manually:
         # - remove the close button from the window frame
         # - install an event filter to intercept and ignore Close events
@@ -33,56 +32,60 @@ class Graph(QtCore.QThread):
         self._init_timeseries()
         self._init_processed()
 
-        # ---------------- SIGNAL CONNECTIONS ----------------
+        # Start listening for data signals
         self.data_signal.connect(self.update_plot)
         self.processed_data.connect(self.update_processed)
 
-    # ---------------- PLOTS ----------------
+
     def _init_timeseries(self):
+        """Initialize the time series plots for each EEG channel."""
         self.plots = []
         self.curves = []
-        for idx, ch in enumerate(self.eeg_channels):
-            p = self.win.addPlot(row=idx, col=0)
+        for i in range(len(self.eeg_channels)):
+            p = self.win.addPlot(row=i, col=0)
             p.showAxis('left', False)
+            p.setMenuEnabled('left', False)
             p.showAxis('bottom', False)
-            if idx == 0:
-                p.setTitle("EEG Raw Data")
-            curve = p.plot()
+            p.setMenuEnabled('bottom', False)
+            if i == 0:
+                p.setTitle('EEG Raw Data')
             self.plots.append(p)
+            curve = p.plot()
             self.curves.append(curve)
 
+    #Plot for processed data
     def _init_processed(self):
         self.plots2 = []
         self.curves2 = []
-        for idx, ch in enumerate(self.eeg_channels):
-            p2 = self.win.addPlot(row=idx, col=1)
+        for i in range(len(self.eeg_channels)):
+            p2 = self.win.addPlot(row=i, col=1)
             p2.showAxis('left', False)
+            p2.setMenuEnabled('left', False)
             p2.showAxis('bottom', False)
-            if idx == 0:
-                p2.setTitle("Processed Signal")
-            curve2 = p2.plot()
+            p2.setMenuEnabled('bottom', False)
+            if i == 0:
+                p2.setTitle('Processed Signal')
             self.plots2.append(p2)
-            self.curves2.append(curve2)
+            curve2 = p2.plot()
+            self.curves2.append(curve2) 
 
-    # ---------------- UPDATE RAW ----------------
     @QtCore.pyqtSlot(object)
     def update_plot(self, data):
-        if not self.running:
-            return
-        for idx, ch in enumerate(self.eeg_channels):
-            self.curves[idx].setData(data[ch].tolist())
+        """Update plot with new data."""
+        for count, channel in enumerate(self.eeg_channels):
+            self.curves[count].setData(data[channel].tolist())
         QtWidgets.QApplication.processEvents()
 
-    # ---------------- UPDATE PROCESSED ----------------
     @QtCore.pyqtSlot(object)
     def update_processed(self, data):
         """Update plot with processed data."""
         for count, channel in enumerate(self.eeg_channels):
             self.curves2[count].setData(data[channel].tolist())
         QtWidgets.QApplication.processEvents()
+        
 
     # -----------------------------------------------------------
-    # CLOSE EVENT OVERRIDE → hide instead of destroying window
+    # Handle close events (user closes window)
     # -----------------------------------------------------------
     def closeEvent(self, event):
         """Called automatically when the window is closed."""
