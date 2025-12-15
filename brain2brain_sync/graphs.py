@@ -9,7 +9,7 @@ class Graph(QtCore.QThread):
     data_signal = QtCore.pyqtSignal(object)  # Signal to receive raw data
     processed_data = QtCore.pyqtSignal(object)  # Signal to receive processed data
 
-    def __init__(self, eeg_channels, sampling_rate):
+    def __init__(self, eeg_channels, sampling_rate, title="Real-Time EEG Data"):
         super().__init__()
         self.eeg_channels = eeg_channels
         self.sampling_rate = sampling_rate
@@ -18,7 +18,7 @@ class Graph(QtCore.QThread):
         self.running = True
 
         # Initialize the application and plot window
-        self.win = pg.GraphicsLayoutWidget(show=True, title="Real-Time EEG Data")
+        self.win = pg.GraphicsLayoutWidget(show=True, title=title)
         # Prevent the user from closing the window manually:
         # - remove the close button from the window frame
         # - install an event filter to intercept and ignore Close events

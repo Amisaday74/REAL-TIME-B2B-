@@ -35,13 +35,18 @@ board_id = BoardIds.SYNTHETIC_BOARD.value
 eeg_channels = BoardShim.get_eeg_channels(board_id)
 sampling_rate = BoardShim.get_sampling_rate(board_id)
 
-def poll_queues(graph, queues):
+def poll_queues(graph1, graph2, queues):
     for q in queues:
         while not q.empty():
             device, raw, processed = q.get()
-            if graph.running:
-                graph.data_signal.emit(raw)
-                graph.processed_data.emit(processed)
+            if device == "Device_1":
+                if graph1.running:
+                    graph1.data_signal.emit(raw)
+                    graph1.processed_data.emit(processed)
+            elif device == "Device_2":
+                if graph2.running:
+                    graph2.data_signal.emit(raw)
+                    graph2.processed_data.emit(processed)
 
 
 ###################################################################################################################################################
@@ -106,11 +111,12 @@ if __name__ == '__main__':
     # Qt GUI runs in main thread (no warning, responsive)
     # -----------------------------------------------------------
     app = QtWidgets.QApplication(sys.argv)
-    graph = Graph(eeg_channels, sampling_rate)
+    graph1 = Graph(eeg_channels, sampling_rate, "Device 1 EEG Data")
+    graph2 = Graph(eeg_channels, sampling_rate, "Device 2 EEG Data")
 
     # Poll incoming data from queues every 100 ms
     q_timer = QtCore.QTimer()
-    q_timer.timeout.connect(lambda: poll_queues(graph, [q1, q2]))
+    q_timer.timeout.connect(lambda: poll_queues(graph1, graph2, [q1, q2]))
     q_timer.start(100)
 
     # Monitor subprocesses; close GUI when all are done
@@ -118,7 +124,8 @@ if __name__ == '__main__':
         alive = any(p.is_alive() for p in [counter, subject1, subject2, bispectrum])
         if not alive:
             print("All processes finished — closing GUI.")
-            graph.close_app()          # emits quit on QApplication
+            graph1.close_app()
+            graph2.close_app()          # emits quit on QApplication
     monitor_timer = QtCore.QTimer()
     monitor_timer.timeout.connect(check_workers)
     monitor_timer.start(500)
