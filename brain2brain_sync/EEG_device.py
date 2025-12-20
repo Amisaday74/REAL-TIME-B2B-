@@ -30,6 +30,11 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
         while (True):
             time.sleep(4)
             data = board.get_board_data()  # get latest 256 packages or less, doesn't remove them from internal buffer.
+            if data.shape[1] < 1000:
+                print(f"Data packet too small: {data.shape[1]} samples. Attempting to recover...")
+                time.sleep(0.1)
+                continue
+
             # make a copy of raw data for storage and graphs avoiding racing conditions
             raw_data = data.copy()
 
@@ -67,8 +72,8 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
             lista1 = list(arrange['referenced_electrode1'].values())
             lista2 = list(arrange['referenced_electrode2'].values())
             
-            datach1[:800] = lista1[:800]
-            datach2[:800] = lista2[:800]
+            datach1[:1000] = lista1[:1000]
+            datach2[:1000] = lista2[:1000]
 
 
             with second.get_lock():

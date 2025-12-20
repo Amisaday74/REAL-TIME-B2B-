@@ -90,9 +90,9 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
     
 
                         # Create an array to store the relevant keys
-                        relevant_keys = np.arange(0, len(df_eo), 400)
+                        relevant_keys = np.arange(0, len(df_eo), 500)
                         
-                        for i in range(400):
+                        for i in range(500):
                             for comb, bis in dic_eo.items():
                                 # Calculate the indices to access values in bis
                                 indices = relevant_keys + i

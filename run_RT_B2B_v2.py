@@ -54,10 +54,10 @@ if __name__ == '__main__':
     # Access to Manager to share memory between proccesses and acces dataframe's 
     mgr = Manager()
 
-    eno1_datach1 = Array('d', 800)
-    eno1_datach2 = Array('d', 800)
-    eno2_datach1 = Array('d', 800)
-    eno2_datach2 = Array('d', 800)
+    eno1_datach1 = Array('d', 1000)
+    eno1_datach2 = Array('d', 1000)
+    eno2_datach1 = Array('d', 1000)
+    eno2_datach2 = Array('d', 1000)
 
     # Write specfic MAC addresses for each device
     mac1 = "f4:0e:11:75:75:a5"
