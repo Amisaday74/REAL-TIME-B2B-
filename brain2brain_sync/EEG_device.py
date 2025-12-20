@@ -4,7 +4,7 @@ from brainflow.data_filter import DataFilter, DetrendOperations
 import time
 
 # # CODE FOR EEG # #
-def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, queue):
+def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, queue, event):
     # The following object will save parameters to connect with the EEG.
     BoardShim.enable_dev_board_logger()
     params = BrainFlowInputParams()
@@ -74,6 +74,9 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
             
             datach1[:1000] = lista1[:1000]
             datach2[:1000] = lista2[:1000]
+
+            # Signal that data is ready
+            event.set()
 
 
             with second.get_lock():

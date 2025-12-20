@@ -2,7 +2,7 @@
 from brain2brain_sync import EEG, bispec, timer, Graph
 
 # Imports for multiprocessing and board shim connection
-from multiprocessing import Process, Value, Manager, Array, Queue
+from multiprocessing import Process, Value, Manager, Array, Queue, Event
 from brainflow.board_shim import BoardIds, BoardShim
 
 # Imports for folders creation and data storage
@@ -92,15 +92,19 @@ if __name__ == '__main__':
     # # Create a multiprocessing List # # 
     timestamps = Manager().list()
 
+    # Create events for synchronization
+    event1 = Event()
+    event2 = Event()
+
     q1 = Queue()
     q2 = Queue()
     graph_closed = threading.Event()
 
     # # Start processes # #
     counter = Process(target=timer, args=[seconds, counts, timestamps])
-    subject1 = Process(target=EEG, args=[seconds, folder, eno1_datach1, eno1_datach2, mac1, "Device_1", board_id, q1])
-    subject2 = Process(target=EEG, args=[seconds, folder, eno2_datach1, eno2_datach2, mac2, "Device_2", board_id, q2])
-    bispectrum = Process(target=bispec, args=[eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, seconds, folder])
+    subject1 = Process(target=EEG, args=[seconds, folder, eno1_datach1, eno1_datach2, mac1, "Device_1", board_id, q1, event1])
+    subject2 = Process(target=EEG, args=[seconds, folder, eno2_datach1, eno2_datach2, mac2, "Device_2", board_id, q2, event2])
+    bispectrum = Process(target=bispec, args=[eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, seconds, folder, event1, event2])
 
     counter.start()
     subject1.start()

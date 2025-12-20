@@ -5,10 +5,13 @@ from brainflow.board_shim import BoardShim, LogLevels
 
 # Finally, for both processes to run, this condition has to be met. Which is met
 # if you run the script.
-def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folder):
+def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folder, event1, event2):
     try:
         while (True):
             time.sleep(4)
+            # Wait for both EEG devices to have data ready
+            event1.wait()
+            event2.wait()
             df_bispecMV1=eno1_datach1
             df_bispecMV2=eno1_datach2
 
@@ -150,6 +153,9 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
 
 
             print(bispectrum_mean)
+            # Clear events for next iteration
+            event1.clear()
+            event2.clear()
             #Graph3(df_gamma_average)
 
     except KeyboardInterrupt:
