@@ -54,6 +54,15 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
             df_norm = np.zeros((len(df_bispec), Nch*Nch))
             #print(df_bispec)
             #df_norm = pd.DataFrame()
+            
+            inspection = df_bispec.copy()
+            # Add timestamp column
+            current_second = None
+            with second.get_lock():
+                current_second = second.value
+            inspection['Timestamp'] = current_second
+            inspection.to_csv('{}/Bispec_inspection.csv'.format(folder), mode='a')
+            
             df_bispec.to_csv('{}/Bispec.csv'.format(folder), mode='a')
             #df_norm = pd.DataFrame()
 
@@ -61,9 +70,9 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
 
             with second.get_lock():
                 # When the seconds reach 312, we exit the functions.
-                if(second.value == 21):
+                if(second.value >= 20):
                     return
-                elif ((second.value > 4) and (second.value <= 8)):
+                elif (second.value <= 8):
                     #Get data to apply normalization
                     for i in range (1):
                         print('Preparing device calibration...')

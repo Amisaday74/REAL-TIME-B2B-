@@ -81,7 +81,7 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
 
             with second.get_lock():
                 # When seconds reach the value, we exit the functions.
-                if(second.value == 21):
+                if(second.value >= 20):
                     BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- End the session with {device_name} ---')
                     break  # exit loop
 
