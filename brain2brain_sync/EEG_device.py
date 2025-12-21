@@ -17,6 +17,11 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
     sampling_rate = BoardShim.get_sampling_rate(board_id)
     board = BoardShim(board_id, params)
 
+    WINDOW_SECONDS = 4
+    WINDOW_SAMPLES = 1000
+    RETRY_SLEEP = 0.05
+
+    last_window = 1
 
     ############# Session is then initialized #######################
     board.prepare_session()
@@ -28,13 +33,27 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
 
     try:
         while (True):
-            time.sleep(4)
-            data = board.get_board_data()  # get latest 256 packages or less, doesn't remove them from internal buffer.
-            if data.shape[1] < 1000:
-                print(f"Data packet too small: {data.shape[1]} samples. Attempting to recover...")
-                time.sleep(0.1)
+            # ---------- WAIT FOR NEXT 4-SECOND TICK ----------
+            with second.get_lock():
+                current_second = second.value
+
+            current_window = current_second // WINDOW_SECONDS
+
+            if current_window == last_window:
+                time.sleep(0.01)
                 continue
 
+            last_window = current_window
+
+            # ---------- WAIT UNTIL ENOUGH DATA ----------
+            while True:
+                data = board.get_current_board_data(WINDOW_SAMPLES)  #Use get_current_board_data(n) to get latest collected data and don't remove it from internal buffer.
+                if data.shape[1] >= WINDOW_SAMPLES:
+                    break
+                time.sleep(RETRY_SLEEP)
+
+            # ---------- SLICE EXACT WINDOW ----------
+            data = board.get_board_data(WINDOW_SAMPLES) #get all collected data and flush it from internal buffer
             # make a copy of raw data for storage and graphs avoiding racing conditions
             raw_data = data.copy()
 
