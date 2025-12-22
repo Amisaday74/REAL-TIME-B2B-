@@ -15,13 +15,14 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
     # Relevant variables are obtained from the current EEG device connected.
     eeg_channels = BoardShim.get_eeg_channels(board_id)
     sampling_rate = BoardShim.get_sampling_rate(board_id)
+    timestamp_channel = BoardShim.get_timestamp_channel(board_id)
     board = BoardShim(board_id, params)
 
     WINDOW_SECONDS = 4
     WINDOW_SAMPLES = 1000
     RETRY_SLEEP = 0.05
 
-    last_window = 1
+    last_window = -1
 
     ############# Session is then initialized #######################
     board.prepare_session()
@@ -36,6 +37,9 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
             # ---------- WAIT FOR NEXT 4-SECOND TICK ----------
             with second.get_lock():
                 current_second = second.value
+                if(second.value >= 20):
+                    BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- End the session with {device_name} ---')
+                    break  # exit loop
 
             current_window = current_second // WINDOW_SECONDS
 
@@ -56,6 +60,7 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
             data = board.get_board_data(WINDOW_SAMPLES) #get all collected data and flush it from internal buffer
             # make a copy of raw data for storage and graphs avoiding racing conditions
             raw_data = data.copy()
+            ts = data[timestamp_channel]
 
             ############## Data collection #################
             # Empty DataFrames are created for raw data.
@@ -75,6 +80,7 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
                 DataFilter.perform_highpass(data[eeg_channel], sampling_rate, cutoff=0.1, order=4, filter_type=0, ripple=0)      
                 df_signal['MV' + str(eeg_channel)] = data[eeg_channel]
             
+            df_crudas["Timestamp"] = ts
             df_crudas.to_csv(f'{folder}/Real_Time_Data/{device_name}_raw_data.csv', mode='a')
             df_signal.to_csv(f'{folder}/Real_Time_Data/{device_name}_signal_processing.csv', mode='a')
 
@@ -97,12 +103,6 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
             # Signal that data is ready
             event.set()
 
-
-            with second.get_lock():
-                # When seconds reach the value, we exit the functions.
-                if(second.value >= 20):
-                    BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- End the session with {device_name} ---')
-                    break  # exit loop
 
     except KeyboardInterrupt:
         BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- Interrupted, ending session with {device_name} ---')
