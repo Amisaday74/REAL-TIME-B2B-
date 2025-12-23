@@ -2,7 +2,7 @@
 from brain2brain_sync import EEG, bispec, timer, Graph
 
 # Imports for multiprocessing and board shim connection
-from multiprocessing import Process, Value, Manager, Array, Queue, Event
+from multiprocessing import Process, Value, Manager, Array, Queue, Event, Lock
 from brainflow.board_shim import BoardIds, BoardShim
 
 # Imports for folders creation and data storage
@@ -54,10 +54,28 @@ if __name__ == '__main__':
     # Access to Manager to share memory between proccesses and acces dataframe's 
     mgr = Manager()
 
-    eno1_datach1 = Array('d', 1000)
-    eno1_datach2 = Array('d', 1000)
-    eno2_datach1 = Array('d', 1000)
-    eno2_datach2 = Array('d', 1000)
+    BUFFER_SECONDS = 20
+    BUFFER_LEN = sampling_rate * BUFFER_SECONDS
+    N_CH = 2  # Number of channels to store (referenced electrodes)
+
+    # -------------------------
+    # Shared ring buffers
+    # -------------------------
+    eno1_buffer_raw = Array('d', N_CH * BUFFER_LEN, lock=False)
+    eno2_buffer_raw = Array('d', N_CH * BUFFER_LEN, lock=False)
+
+    # Write indices
+    eno1_write_idx = Value('i', 0)
+    eno2_write_idx = Value('i', 0)
+
+    # Locks (single-writer, multi-reader safe)
+    eno1_lock = Lock()
+    eno2_lock = Lock()
+
+    # NumPy views (VERY IMPORTANT)
+    eno1_buffer_np = np.frombuffer(eno1_buffer_raw, dtype=np.float64).reshape(N_CH, BUFFER_LEN)
+
+    eno2_buffer_np = np.frombuffer(eno2_buffer_raw, dtype=np.float64).reshape(N_CH, BUFFER_LEN)
 
     # Write specfic MAC addresses for each device
     mac1 = "f4:0e:11:75:75:a5"
@@ -102,9 +120,9 @@ if __name__ == '__main__':
 
     # # Start processes # #
     counter = Process(target=timer, args=[seconds, counts, timestamps])
-    subject1 = Process(target=EEG, args=[seconds, folder, eno1_datach1, eno1_datach2, mac1, "Device_1", board_id, q1, event1])
-    subject2 = Process(target=EEG, args=[seconds, folder, eno2_datach1, eno2_datach2, mac2, "Device_2", board_id, q2, event2])
-    bispectrum = Process(target=bispec, args=[eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, seconds, folder, event1, event2])
+    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_np, eno1_write_idx, eno1_lock, mac1, "Device_1", board_id, q1, event1])
+    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_np, eno2_write_idx, eno2_lock, mac2, "Device_2", board_id, q2, event2])
+    bispectrum = Process(target=bispec, args=[eno1_buffer_np, eno1_write_idx, eno1_lock, eno2_buffer_np, eno2_write_idx, eno2_lock, seconds, folder, event1, event2])
 
     counter.start()
     subject1.start()

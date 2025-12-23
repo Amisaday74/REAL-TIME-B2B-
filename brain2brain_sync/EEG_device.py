@@ -2,9 +2,32 @@ import pandas as pd
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, LogLevels, BoardIds
 from brainflow.data_filter import DataFilter, DetrendOperations
 import time
+import numpy as np
 
 #-------------------- CODE FOR EEG DEVICE CONNECTION AND DATA PROCESSING --------------------#
-def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, queue, event):
+def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, board_id, queue, event):
+
+    def write_ring(buffer, write_idx, lock, new_data):
+        """
+        buffer: np.ndarray [channels, buffer_len]
+        new_data: np.ndarray [channels, n_samples]
+        """
+        n_samples = new_data.shape[1]
+        buffer_len = buffer.shape[1]
+
+        with lock:
+            idx = write_idx.value
+            end = idx + n_samples
+
+            if end <= buffer_len:
+                buffer[:, idx:end] = new_data
+            else:
+                first = buffer_len - idx
+                buffer[:, idx:] = new_data[:, :first]
+                buffer[:, :end % buffer_len] = new_data[:, first:]
+
+            write_idx.value = end % buffer_len
+
     # The following object will save parameters to connect with the EEG device.
     BoardShim.enable_dev_board_logger()
     params = BrainFlowInputParams()
@@ -91,12 +114,13 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
             referenced_electrodes['referenced_electrode1'] = df_signal['CH3'] - ((df_signal['CH1'] + df_signal['CH2']) / 2)
             referenced_electrodes['referenced_electrode2'] = df_signal['CH4'] - ((df_signal['CH1'] + df_signal['CH2']) / 2)
 
-            arrange=referenced_electrodes.to_dict('dict')
-            lista1 = list(arrange['referenced_electrode1'].values())
-            lista2 = list(arrange['referenced_electrode2'].values())
-            
-            datach1[:data_samples] = lista1[:data_samples]
-            datach2[:data_samples] = lista2[:data_samples]
+            # Write to ring buffer
+            ring_block = np.vstack([
+                referenced_electrodes['referenced_electrode1'].values,
+                referenced_electrodes['referenced_electrode2'].values
+            ])
+
+            write_ring(buffer_np, write_idx, lock, ring_block)
 
             # Signal that data is ready
             event.set()
