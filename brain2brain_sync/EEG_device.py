@@ -3,85 +3,84 @@ from brainflow.board_shim import BoardShim, BrainFlowInputParams, LogLevels, Boa
 from brainflow.data_filter import DataFilter, DetrendOperations
 import time
 
-# # CODE FOR EEG # #
+#-------------------- CODE FOR EEG DEVICE CONNECTION AND DATA PROCESSING --------------------#
 def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, queue, event):
-    # The following object will save parameters to connect with the EEG.
+    # The following object will save parameters to connect with the EEG device.
     BoardShim.enable_dev_board_logger()
     params = BrainFlowInputParams()
-
+    # If the device is Enophone, the MAC address has to be specified.
     if board_id == BoardIds.ENOPHONE_BOARD.value:
         params.mac_address = mac_address
 
-    # Relevant variables are obtained from the current EEG device connected.
+    # Relevant variables are obtained from the EEG device connected.
     eeg_channels = BoardShim.get_eeg_channels(board_id)
     sampling_rate = BoardShim.get_sampling_rate(board_id)
     timestamp_channel = BoardShim.get_timestamp_channel(board_id)
     board = BoardShim(board_id, params)
 
-    WINDOW_SECONDS = 4
-    WINDOW_SAMPLES = 1000
-    RETRY_SLEEP = 0.05
-
-    last_window = -1
+    # Define constants for data collection
+    time_window = 4
+    data_samples = 1000
+    last_window = -1  
 
     ############# Session is then initialized #######################
     board.prepare_session()
     board.start_stream(45000, f"file://{folder}/{device_name}_testOpenBCI.csv:w")
     BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- Starting the streaming with {device_name} ---')
 
-    # Initialize the Graph in a separate thread
-    # graph = Graph(eeg_channels, sampling_rate)
-
     try:
         while (True):
-            # ---------- WAIT FOR NEXT 4-SECOND TICK ----------
+            # ---------- TIME WINDOWS LOGIC ----------
+            """
+            --------- FIRST 4-SECOND WINDOW (WINDOW 0)---------
+            Real time (s)	second.value
+            0.00 - 0.99	          0
+            1.00 - 1.99	          1
+            2.00 - 2.99	          2
+            3.00 - 3.99	          3     
+            --------- NEXT 4-SECOND WINDOW (WINDOW 1)---------
+            4.00 - 4.99	          4
+            """
             with second.get_lock():
-                current_second = second.value
-                if(second.value >= 20):
+                current_second = second.value  # Make this function responsive to main timer updates
+                if(current_second >= 20):
                     BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- End the session with {device_name} ---')
                     break  # exit loop
 
-            current_window = current_second // WINDOW_SECONDS
-
+            current_window = current_second // time_window # Determine the current 4-second window 
             if current_window == last_window:
-                time.sleep(0.01)
+                time.sleep(0.01) # Cooperative scheduling pause, serves to prevent busy-waiting, reducing CPU usage and jitter for real-time systems.
                 continue
-
             last_window = current_window
 
-            # ---------- WAIT UNTIL ENOUGH DATA ----------
+            # ---------- DATA ACQUISITION ----------
+            # Loop to start collecting data, processing happens only when sample count is sufficient, not merely when time has passed.
             while True:
-                data = board.get_current_board_data(WINDOW_SAMPLES)  #Use get_current_board_data(n) to get latest collected data and don't remove it from internal buffer.
-                if data.shape[1] >= WINDOW_SAMPLES:
+                data = board.get_current_board_data(data_samples)  #Use get_current_board_data(n) to get latest collected data and don't remove it from internal buffer.
+                if data.shape[1] >= data_samples:
                     break
-                time.sleep(RETRY_SLEEP)
+                time.sleep(0.05) # Allows driver threads to run safely and prevents buffers trashing.
 
-            # ---------- SLICE EXACT WINDOW ----------
-            data = board.get_board_data(WINDOW_SAMPLES) #get all collected data and flush it from internal buffer
-            # make a copy of raw data for storage and graphs avoiding racing conditions
-            raw_data = data.copy()
-            ts = data[timestamp_channel]
+            data = board.get_board_data(data_samples) #get all collected data and flush it from internal buffer
+            raw_data = data.copy() # make a copy of raw data for storage and graphs avoiding racing conditions
 
-            ############## Data collection #################
-            # Empty DataFrames are created for raw data.
-            df_signal = pd.DataFrame(columns=['MV' + str(channel) for channel in range(1, len(eeg_channels) + 1)])
-            df_crudas = pd.DataFrame(columns=['MV' + str(channel) for channel in range(1, len(eeg_channels) + 1)])
+            # ---------- PREPROCESSING AND DATAFRAME CREATION ----------
+            df_signal = pd.DataFrame(columns=['CH' + str(channel) for channel in range(1, len(eeg_channels) + 1)])
+            df_raw = pd.DataFrame(columns=['CH' + str(channel) for channel in range(1, len(eeg_channels) + 1)])
             
-            # The total number of EEG channels is looped to obtain MV for each channel, and
-            # thus saved it on the corresponding columns of the respective DataFrame.
+            # The total number of EEG channels is looped to process EEG data (uV) for each channel
             for eeg_channel in eeg_channels:
-                df_crudas['MV' + str(eeg_channel)] = data[eeg_channel]
+                df_raw['CH' + str(eeg_channel)] = data[eeg_channel]
                 DataFilter.detrend(data[eeg_channel], DetrendOperations.LINEAR.value)
-                ####################START OF PREPROCESING#############################
                 #Filter for envirionmental noise (Notch: 0=50Hz 1=60Hz)
                 DataFilter.remove_environmental_noise(data[eeg_channel], sampling_rate, noise_type=1)
                 #Bandpass Filter
                 DataFilter.perform_lowpass(data[eeg_channel], sampling_rate, cutoff=100, order=4, filter_type=0, ripple=0)
                 DataFilter.perform_highpass(data[eeg_channel], sampling_rate, cutoff=0.1, order=4, filter_type=0, ripple=0)      
-                df_signal['MV' + str(eeg_channel)] = data[eeg_channel]
+                df_signal['CH' + str(eeg_channel)] = data[eeg_channel]
             
-            df_crudas["Timestamp"] = ts
-            df_crudas.to_csv(f'{folder}/Real_Time_Data/{device_name}_raw_data.csv', mode='a')
+            df_raw["Timestamp (UNIX)"] = data[timestamp_channel]
+            df_raw.to_csv(f'{folder}/Real_Time_Data/{device_name}_raw_data.csv', mode='a')
             df_signal.to_csv(f'{folder}/Real_Time_Data/{device_name}_signal_processing.csv', mode='a')
 
             # Send data to the graph in the background if it is still open
@@ -89,16 +88,15 @@ def EEG(second, folder, datach1, datach2, mac_address, device_name, board_id, qu
             
             # Calculate the new variable based on the formula
             referenced_electrodes = pd.DataFrame()
-            referenced_electrodes['referenced_electrode1'] = df_signal['MV3'] - ((df_signal['MV1'] + df_signal['MV2']) / 2)
-            referenced_electrodes['referenced_electrode2'] = df_signal['MV4'] - ((df_signal['MV1'] + df_signal['MV2']) / 2)
+            referenced_electrodes['referenced_electrode1'] = df_signal['CH3'] - ((df_signal['CH1'] + df_signal['CH2']) / 2)
+            referenced_electrodes['referenced_electrode2'] = df_signal['CH4'] - ((df_signal['CH1'] + df_signal['CH2']) / 2)
 
-            # Both raw and PSD DataFrame is exported as a CSV.
             arrange=referenced_electrodes.to_dict('dict')
             lista1 = list(arrange['referenced_electrode1'].values())
             lista2 = list(arrange['referenced_electrode2'].values())
             
-            datach1[:1000] = lista1[:1000]
-            datach2[:1000] = lista2[:1000]
+            datach1[:data_samples] = lista1[:data_samples]
+            datach2[:data_samples] = lista2[:data_samples]
 
             # Signal that data is ready
             event.set()
