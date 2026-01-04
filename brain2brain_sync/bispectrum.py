@@ -20,6 +20,7 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock,
 
             if start < idx:
                 data = buffer[:, start:idx]
+                print(f"Reading data from ring buffer from index {start} to {idx}: {data}")
             else:
                 data = np.hstack((
                     buffer[:, start:],

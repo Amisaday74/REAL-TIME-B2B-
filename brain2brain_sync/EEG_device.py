@@ -21,10 +21,12 @@ def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, bo
 
             if end <= buffer_len:
                 buffer[:, idx:end] = new_data
+                print(f"Writing data to ring buffer from index {idx} to {end}: {buffer}")
             else:
                 first = buffer_len - idx
                 buffer[:, idx:] = new_data[:, :first]
                 buffer[:, :end % buffer_len] = new_data[:, first:]
+                print(f"Writing data to ring buffer with wrap-around from index {idx} to {end % buffer_len}: {buffer}")
 
             write_idx.value = end % buffer_len
 
@@ -121,6 +123,7 @@ def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, bo
             ])
 
             write_ring(buffer_np, write_idx, lock, ring_block)
+            print(f"Memory ring buffer after write: {buffer_np}")
 
             # Signal that data is ready
             event.set()
