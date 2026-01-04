@@ -4,9 +4,7 @@ from brainflow.board_shim import BoardShim, LogLevels
 
 # Finally, for both processes to run, this condition has to be met. Which is met
 # if you run the script.
-def bispec(eno1_buffer, eno1_write_idx, eno1_lock,
-           eno2_buffer, eno2_write_idx, eno2_lock,
-           second, folder, event1, event2):
+def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, eno2_lock, second, folder, event1, event2):
     def read_ring(buffer, write_idx, lock, window_size):
         """
         Returns last `window_size` samples as a stable copy
@@ -27,7 +25,7 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock,
                     buffer[:, :idx]
                 ))
 
-        return data.copy()
+            return data.copy()
     
     WINDOW_SAMPLES = 1000
     N_CH = 2
@@ -39,13 +37,11 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock,
             event2.wait()
 
             # Read last 4 seconds of data from both devices
-            eno1_window = read_ring(
-                eno1_buffer, eno1_write_idx, eno1_lock, WINDOW_SAMPLES
-            )
+            eno1_window = read_ring(eno1_buffer, eno1_write_idx, eno1_lock, WINDOW_SAMPLES)
 
-            eno2_window = read_ring(
-                eno2_buffer, eno2_write_idx, eno2_lock, WINDOW_SAMPLES
-            )
+            eno2_window = read_ring(eno2_buffer, eno2_write_idx, eno2_lock, WINDOW_SAMPLES)
+
+            print(f"Memory ring buffer after read: {eno1_window}")
 
             # Shape: [samples, channels]
             matrix_eno1t = eno1_window.T

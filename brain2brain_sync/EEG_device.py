@@ -29,6 +29,7 @@ def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, bo
                 print(f"Writing data to ring buffer with wrap-around from index {idx} to {end % buffer_len}: {buffer}")
 
             write_idx.value = end % buffer_len
+            return buffer.copy()
 
     # The following object will save parameters to connect with the EEG device.
     BoardShim.enable_dev_board_logger()
@@ -122,8 +123,8 @@ def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, bo
                 referenced_electrodes['referenced_electrode2'].values
             ])
 
-            write_ring(buffer_np, write_idx, lock, ring_block)
-            print(f"Memory ring buffer after write: {buffer_np}")
+            buffer_np = write_ring(buffer_np, write_idx, lock, ring_block)
+            print(f"Memory ring buffer after write: {buffer_np} ")
 
             # Signal that data is ready
             event.set()
