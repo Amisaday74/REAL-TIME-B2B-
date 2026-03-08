@@ -25,7 +25,10 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
                     buffer[:, :idx]
                 ))
 
-            return data.copy()
+            # same safe reading pattern as reader()
+            data = data.copy()
+
+        return data
     
     WINDOW_SAMPLES = 1000
     N_CH = 2
@@ -37,9 +40,13 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
             event2.wait()
 
             # Read last 4 seconds of data from both devices
-            eno1_window = read_ring(eno1_buffer, eno1_write_idx, eno1_lock, WINDOW_SAMPLES)
+            # NumPy views (VERY IMPORTANT)
+            eno1_buffer_np = np.frombuffer(eno1_buffer, dtype=np.float64).reshape(N_CH, -1)
 
-            eno2_window = read_ring(eno2_buffer, eno2_write_idx, eno2_lock, WINDOW_SAMPLES)
+            eno2_buffer_np = np.frombuffer(eno2_buffer, dtype=np.float64).reshape(N_CH, -1)
+            eno1_window = read_ring(eno1_buffer_np, eno1_write_idx, eno1_lock, WINDOW_SAMPLES)
+
+            eno2_window = read_ring(eno2_buffer_np, eno2_write_idx, eno2_lock, WINDOW_SAMPLES)
 
             print(f"Memory ring buffer after read: {eno1_window}")
 

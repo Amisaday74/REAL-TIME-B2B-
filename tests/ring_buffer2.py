@@ -14,22 +14,23 @@ def writer(shared_array, event):
     while True:
         time.sleep(4)
 
-        # Simulate 2-channel data (like EEG referenced electrodes)
-        new_data = np.random.randint(
-            1, 1000, size=(2, buffer.shape[1])
-        ).astype(np.float64)
+        # Generate two independent channels
+        ch1 = np.random.randint(1, 1000, size=buffer.shape[1]).astype(np.float64)
+        ch2 = np.random.randint(1, 1000, size=buffer.shape[1]).astype(np.float64)
+
+        # Stack them to create the same (2, N) structure
+        new_data = np.vstack((ch1, ch2))
 
         print("Generated data:")
         print(new_data)
 
-        # In-place write (CRITICAL)
+        # Same write operation as before
         buffer[:, :] = new_data
 
         print("Written to shared buffer:")
         print(buffer)
 
         event.set()
-
 def reader(shared_array, event):
     buffer = np.frombuffer(shared_array, dtype=np.float64)
     buffer = buffer.reshape(2, -1)

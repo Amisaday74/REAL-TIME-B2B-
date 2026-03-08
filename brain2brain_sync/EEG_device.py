@@ -122,6 +122,8 @@ def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, bo
                 referenced_electrodes['referenced_electrode1'].values,
                 referenced_electrodes['referenced_electrode2'].values
             ])
+            # NumPy views (VERY IMPORTANT)
+            buffer_np = np.frombuffer(buffer_np, dtype=np.float64).reshape(2, -1)
 
             buffer_np = write_ring(buffer_np, write_idx, lock, ring_block)
             print(f"Memory ring buffer after write: {buffer_np} ")

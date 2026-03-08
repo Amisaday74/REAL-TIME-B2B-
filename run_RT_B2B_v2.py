@@ -72,10 +72,7 @@ if __name__ == '__main__':
     eno1_lock = Lock()
     eno2_lock = Lock()
 
-    # NumPy views (VERY IMPORTANT)
-    eno1_buffer_np = np.frombuffer(eno1_buffer_raw, dtype=np.float64).reshape(N_CH, BUFFER_LEN)
 
-    eno2_buffer_np = np.frombuffer(eno2_buffer_raw, dtype=np.float64).reshape(N_CH, BUFFER_LEN)
 
     # Write specfic MAC addresses for each device
     mac1 = "f4:0e:11:75:75:a5"
@@ -120,9 +117,9 @@ if __name__ == '__main__':
 
     # # Start processes # #
     counter = Process(target=timer, args=[seconds, counts, timestamps])
-    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_np, eno1_write_idx, eno1_lock, mac1, "Device_1", board_id, q1, event1])
-    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_np, eno2_write_idx, eno2_lock, mac2, "Device_2", board_id, q2, event2])
-    bispectrum = Process(target=bispec, args=[eno1_buffer_np, eno1_write_idx, eno1_lock, eno2_buffer_np, eno2_write_idx, eno2_lock, seconds, folder, event1, event2])
+    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, "Device_1", board_id, q1, event1])
+    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, "Device_2", board_id, q2, event2])
+    bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2])
 
     counter.start()
     subject1.start()
