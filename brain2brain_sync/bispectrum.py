@@ -8,7 +8,6 @@ from brainflow.board_shim import BoardShim, LogLevels
 def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folder, event1, event2):
     try:
         while (True):
-            time.sleep(4)
             # Wait for both EEG devices to have data ready
             event1.wait()
             event2.wait()
@@ -52,8 +51,6 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
             for eeg_channel2 in range (0,4):
                 df_bispec['COMB' + str(eeg_channel2)] = b_transpose[eeg_channel2]
             df_norm = np.zeros((len(df_bispec), Nch*Nch))
-            #print(df_bispec)
-            #df_norm = pd.DataFrame()
             
             inspection = df_bispec.copy()
             # Add timestamp column
@@ -64,7 +61,6 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
             inspection.to_csv('{}/Bispec_inspection.csv'.format(folder), mode='a')
             
             df_bispec.to_csv('{}/Bispec.csv'.format(folder), mode='a')
-            #df_norm = pd.DataFrame()
 
             
 
@@ -155,8 +151,6 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
 
             # Assign the new column names to the DataFrame
             bispectrum_mean.columns = new_column_names
-
-                            #matrix = pd.DataFrame(arrange3).transpose()
             bispectrum_mean.to_csv('{}/Frequency_bands_bispectrum.csv'.format(folder), mode='a')
 
 
@@ -165,7 +159,6 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
             # Clear events for next iteration
             event1.clear()
             event2.clear()
-            #Graph3(df_gamma_average)
 
     except KeyboardInterrupt:
         BoardShim.log_message(LogLevels.LEVEL_INFO.value, ' ---- End the session with Enophone 2 ---')
