@@ -1,34 +1,65 @@
-import time
 import numpy as np
 import pandas as pd
 from brainflow.board_shim import BoardShim, LogLevels
 
 # Finally, for both processes to run, this condition has to be met. Which is met
 # if you run the script.
-def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folder, event1, event2):
+def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, eno2_lock, second, folder, event1, event2):
+    def read_ring(buffer, write_idx, lock, window_size):
+        """
+        Returns last `window_size` samples as a stable copy
+        Shape: [channels, window_size]
+        """
+        buffer_len = buffer.shape[1]
+
+        with lock:
+            idx = write_idx.value
+            start = (idx - window_size) % buffer_len
+
+            if start < idx:
+                data = buffer[:, start:idx]
+                print(f"Reading data from ring buffer from index {start} to {idx}: {data}")
+            else:
+                data = np.hstack((
+                    buffer[:, start:],
+                    buffer[:, :idx]
+                ))
+
+            # same safe reading pattern as reader()
+            data = data.copy()
+
+        return data
+    
+    WINDOW_SAMPLES = 1000
+    N_CH = 2
+
     try:
         while (True):
             # Wait for both EEG devices to have data ready
             event1.wait()
             event2.wait()
-            df_bispecMV1=eno1_datach1
-            df_bispecMV2=eno1_datach2
 
+            # Read last 4 seconds of data from both devices
+            # NumPy views (VERY IMPORTANT)
+            eno1_buffer_np = np.frombuffer(eno1_buffer, dtype=np.float64).reshape(N_CH, -1)
 
-            df_bispec2MV1=eno2_datach1
-            df_bispec2MV2=eno2_datach2
+            eno2_buffer_np = np.frombuffer(eno2_buffer, dtype=np.float64).reshape(N_CH, -1)
+            eno1_window = read_ring(eno1_buffer_np, eno1_write_idx, eno1_lock, WINDOW_SAMPLES)
 
+            eno2_window = read_ring(eno2_buffer_np, eno2_write_idx, eno2_lock, WINDOW_SAMPLES)
 
-            matrix_eno1=np.array([df_bispecMV1[:], df_bispecMV2[:]])
-            matrix_eno1t=matrix_eno1.transpose()
-            matrix_eno2=np.array([df_bispec2MV1[:], df_bispec2MV2[:]])
-            matrix_eno2t=matrix_eno2.transpose()
+            print(f"Memory ring buffer after read: {eno1_window}")
+
+            # Shape: [samples, channels]
+            matrix_eno1t = eno1_window.T
+            matrix_eno2t = eno2_window.T
+            print(f"Showing data before bispectrum calculus{matrix_eno1t}")
 
 
             cont = 0
             Nch=2
 
-            B = np.zeros((Nch*Nch, len(df_bispecMV1)//2))
+            B = np.zeros((Nch*Nch, WINDOW_SAMPLES//2))
             index = np.zeros((Nch*Nch, 2))
             
 
@@ -38,8 +69,6 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
                     B[cont, :] = np.log(bs[:len(bs)//2].T)  # Mean windows bs on all channels
                     index[cont, :] = [ch1+1, ch2+1]  # Indexing combination order: ch1,ch2
                     cont += 1
-                
-                #df_time[Nch] = B[Nch]
             print(B)
             
             
@@ -61,7 +90,6 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
             inspection.to_csv('{}/Bispec_inspection.csv'.format(folder), mode='a')
             
             df_bispec.to_csv('{}/Bispec.csv'.format(folder), mode='a')
-
             
 
             with second.get_lock():
@@ -96,7 +124,6 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
                         dic_eo = df_eo2.to_dict('dict')
                     
     
-
                         # Create an array to store the relevant keys
                         relevant_keys = np.arange(0, len(df_eo), 500)
                         
@@ -114,7 +141,6 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
             df_sub = df_bispec.sub(df_sum2)
             df_div = df_sub.div(df_sum2)
             print(df_div)
-
 
 
             #Get frequency bands to apply in bispectrum matrix normalized
@@ -151,6 +177,7 @@ def bispec(eno1_datach1, eno1_datach2, eno2_datach1, eno2_datach2, second, folde
 
             # Assign the new column names to the DataFrame
             bispectrum_mean.columns = new_column_names
+
             bispectrum_mean.to_csv('{}/Frequency_bands_bispectrum.csv'.format(folder), mode='a')
 
 
