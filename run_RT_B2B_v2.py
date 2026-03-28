@@ -7,6 +7,7 @@ from brainflow.board_shim import BoardIds, BoardShim
 
 # Imports for folders creation and data storage
 import os
+import json
 from datetime import datetime
 from colorama import Fore, Style
 
@@ -23,27 +24,31 @@ import threading
 
 # # CODE FOR REAL TIME TEST # #
 
+# # Load configuration from JSON file # #
+with open('config.json', 'r') as config_file:
+    config = json.load(config_file)
+
 # # Create a Value data object # #
 # This object can store a single integer and share it across multiple parallel processes
 seconds = Value("i", 0)
 counts = Value("i", 0)
 
 
-# Choose the board ID here, once
-# board_id = BoardIds.ENOPHONE_BOARD.value
-board_id = BoardIds.SYNTHETIC_BOARD.value
+# Choose the board ID from config
+board_id_name = config['board_id']
+board_id = getattr(BoardIds, board_id_name).value
 eeg_channels = BoardShim.get_eeg_channels(board_id)
 sampling_rate = BoardShim.get_sampling_rate(board_id)
 
-def poll_queues(graph1, graph2, queues):
+def poll_queues(graph1, graph2, queues, device_1_name, device_2_name):
     for q in queues:
         while not q.empty():
             device, raw, processed = q.get()
-            if device == "Device_1":
+            if device == device_1_name:
                 if graph1.running:
                     graph1.data_signal.emit(raw)
                     graph1.processed_data.emit(processed)
-            elif device == "Device_2":
+            elif device == device_2_name:
                 if graph2.running:
                     graph2.data_signal.emit(raw)
                     graph2.processed_data.emit(processed)
@@ -74,9 +79,11 @@ if __name__ == '__main__':
 
 
 
-    # Write specfic MAC addresses for each device
-    mac1 = "f4:0e:11:75:75:a5"
-    mac2 = "aa:bb:cc:dd:ee:ff"  
+    # Load MAC addresses from configuration
+    mac1 = config['devices'][0]['mac_address']
+    mac2 = config['devices'][1]['mac_address']
+    device_1_name = config['devices'][0]['device_name']
+    device_2_name = config['devices'][1]['device_name']  
 
     # # Define the data folder # #
     # The name of the folder is defined depending on the user's input
@@ -117,8 +124,8 @@ if __name__ == '__main__':
 
     # # Start processes # #
     counter = Process(target=timer, args=[seconds, counts, timestamps])
-    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, "Device_1", board_id, q1, event1])
-    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, "Device_2", board_id, q2, event2])
+    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, device_1_name, board_id, q1, event1])
+    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, device_2_name, board_id, q2, event2])
     bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2])
 
     counter.start()
@@ -135,7 +142,7 @@ if __name__ == '__main__':
 
     # Poll incoming data from queues every 100 ms
     q_timer = QtCore.QTimer()
-    q_timer.timeout.connect(lambda: poll_queues(graph1, graph2, [q1, q2]))
+    q_timer.timeout.connect(lambda: poll_queues(graph1, graph2, [q1, q2], device_1_name, device_2_name))
     q_timer.start(100)
 
     # Monitor subprocesses; close GUI when all are done

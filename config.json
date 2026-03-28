@@ -1,0 +1,17 @@
+{
+  "board_id": "SYNTHETIC_BOARD",
+  "devices": [
+    {
+      "device_id": 1,
+      "device_name": "Device_1",
+      "user": "User_1",
+      "mac_address": "f4:0e:11:75:75:a5"
+    },
+    {
+      "device_id": 2,
+      "device_name": "Device_2",
+      "user": "User_2",
+      "mac_address": "aa:bb:cc:dd:ee:ff"
+    }
+  ]
+}
