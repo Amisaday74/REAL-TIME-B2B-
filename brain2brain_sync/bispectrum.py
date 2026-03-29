@@ -4,7 +4,7 @@ from brainflow.board_shim import BoardShim, LogLevels
 
 # Finally, for both processes to run, this condition has to be met. Which is met
 # if you run the script.
-def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, eno2_lock, second, folder, event1, event2, completion_event):
+def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, eno2_lock, second, folder, event1, event2, completion_event, bispectrum_channels):
     def read_ring(buffer, write_idx, lock, window_size):
         """
         Returns last `window_size` samples as a stable copy
@@ -31,7 +31,8 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
         return data
     
     WINDOW_SAMPLES = 1000
-    N_CH = 2
+    N_CH = bispectrum_channels
+    bispectrum_length = WINDOW_SAMPLES // N_CH
 
     try:
         while (True):
@@ -59,7 +60,7 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
             cont = 0
             Nch=2
 
-            B = np.zeros((Nch*Nch, WINDOW_SAMPLES//2))
+            B = np.zeros((Nch*Nch, bispectrum_length))  # Initialize B with the correct shape
             index = np.zeros((Nch*Nch, 2))
             
 
@@ -130,9 +131,9 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
                     
     
                         # Create an array to store the relevant keys
-                        relevant_keys = np.arange(0, len(df_eo), 500)
+                        relevant_keys = np.arange(0, len(df_eo), bispectrum_length)
                         
-                        for i in range(500):
+                        for i in range(bispectrum_length):
                             for comb, bis in dic_eo.items():
                                 # Calculate the indices to access values in bis
                                 indices = relevant_keys + i

@@ -38,6 +38,9 @@ board_id_name = config['board_id']
 board_id = getattr(BoardIds, board_id_name).value
 eeg_channels = BoardShim.get_eeg_channels(board_id)
 sampling_rate = BoardShim.get_sampling_rate(board_id)
+test_duration = config['test_duration_seconds']
+timewindow = config['timewindow_seconds']
+bispectrum_channels = config['channels_for_bispectrum']
 
 def poll_queues(graph1, graph2, queues, device_1_name, device_2_name):
     for q in queues:
@@ -60,7 +63,7 @@ if __name__ == '__main__':
 
     BUFFER_SECONDS = 20
     BUFFER_LEN = sampling_rate * BUFFER_SECONDS
-    N_CH = 2  # Number of channels to store (referenced electrodes)
+    N_CH = bispectrum_channels  # Number of channels to store (referenced electrodes)
 
     # -------------------------
     # Shared ring buffers
@@ -123,10 +126,10 @@ if __name__ == '__main__':
     graph_closed = threading.Event()
 
     # # Start processes # #
-    counter = Process(target=timer, args=[seconds, completion_event])
-    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, device_1_name, board_id, q1, event1, completion_event])
-    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, device_2_name, board_id, q2, event2, completion_event])
-    bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2, completion_event])
+    counter = Process(target=timer, args=[seconds, completion_event, test_duration])
+    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, device_1_name, board_id, q1, event1, completion_event, timewindow])
+    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, device_2_name, board_id, q2, event2, completion_event, timewindow])
+    bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2, completion_event, bispectrum_channels])
 
     counter.start()
     subject1.start()
@@ -169,57 +172,7 @@ if __name__ == '__main__':
     # # DATA STORAGE SECTION # #
     # Executed only once the test has finished.
     print(Fore.RED + 'Test finished successfully, storing data now...' + Style.RESET_ALL)
-    print(Fore.GREEN + 'Data stored successfully' + Style.RESET_ALL)
-
-    # # Data processing # #
-    print(Fore.RED + 'Data being processed...' + Style.RESET_ALL)
-
-
-    # # POST REAL-TIME OUTLIERS REMOVAL SECTION # #
-    def remove_outliers(df, method):
-        """
-        Uses an statistical method to remove outlier rows from the dataset x, and filters the valid rows back to y.
-
-        :param pd.DataFrame df: with non-normalized, source variables.
-        :param string method: type of statistical method used.
-        :return pd.DataFrame: Filtered DataFrame
-        """
-
-        # The number of initial rows is saved.
-        n_pre = df.shape[0]
-
-        # A switch case selects an statistical method to remove rows considered as outliers.
-        if method == 'z-score':
-            z = np.abs(stats.zscore(df))
-            df = df[(z < 3).all(axis=1)]
-        elif method == 'quantile':
-            q1 = df.quantile(q=.25)
-            q3 = df.quantile(q=.75)
-            iqr = df.apply(stats.iqr)
-            df = df[~((df < (q1 - 1.5 * iqr)) | (df > (q3 + 1.5 * iqr))).any(axis=1)]
-        
-        # The difference between the processed and raw rows is printed.
-        n_pos = df.shape[0]
-        diff = n_pre - n_pos
-        print(f'{diff} rows removed {round(diff / n_pre * 100, 2)}%')
-        return df
-    
-    # The following for loop iterates over all features, and removes outliers depending on the statistical method used.
-    for df_name in os.listdir('{}/Real_Time_Data/'.format(folder)):
-        if df_name[-4:] == '.csv' and df_name[:4] != 'file':
-            df_name = df_name[:-4]
-            df_raw = pd.read_csv('{}/Real_Time_Data/{}.csv'.format(folder, df_name), index_col=0)
-            df_processed = remove_outliers(df_raw.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True), 'quantile')
-            
-            # The processed DataFrame is then exported to the "Processed" folder, and plotted.
-            df_processed.to_csv('{}/Processed/{}_processed.csv'.format(folder, df_name))
-            df_processed.plot()
-
-            # The plot of the processed DataFrame is saved in the "Figures" folder.
-            plt.savefig('{}/Figures/{}_plot.png'.format(folder, df_name))
-
-
-    print(Fore.GREEN + 'Data processed successfully' + Style.RESET_ALL)
+    print(Fore.GREEN + 'Data has been stored successfully. Preparing bispectrum results...' + Style.RESET_ALL)
 
 
     # # POST REAL-TIME BISPECTRUM PLOTS SECTION # #
@@ -231,11 +184,8 @@ if __name__ == '__main__':
     # Replace -inf and inf with 0 in your DataFrame
     data_graph = data_graph.replace([float('-inf'), float('inf')], 0)
     print(df_graph)
-'''
-    # Generate a time index from 0 to 420 seconds with the same length as your DataFrame
-    time_index = np.linspace(0, 180, len(data_graph))
-    print(seconds)
-    print(timestamps)
+    # Generate a time index from 0 to test_duration seconds with the same length as your DataFrame
+    time_index = np.linspace(0, test_duration, len(data_graph))
     for column in data_graph.columns:
         plt.figure(figsize=(8, 6))
         plt.plot(time_index, data_graph[column], label=column)
@@ -245,8 +195,6 @@ if __name__ == '__main__':
         plt.legend()
         plt.grid(True)
         plt.savefig(f'{folder}/Figures/{column}_plot.png')
-        plt.show()
-'''
 
 ####### Sources ########
 # To understand Value data type and lock method read the following link:

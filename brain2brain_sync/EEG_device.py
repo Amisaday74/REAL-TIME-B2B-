@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 #-------------------- CODE FOR EEG DEVICE CONNECTION AND DATA PROCESSING --------------------#
-def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, board_id, queue, event, completion_event):
+def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, board_id, queue, event, completion_event, timewindow):
 
     def write_ring(buffer, write_idx, lock, new_data):
         """
@@ -44,8 +44,8 @@ def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, bo
     board = BoardShim(board_id, params)
 
     # Define constants for data collection
-    time_window = 4
-    data_samples = 1000
+    time_window = timewindow  # seconds
+    data_samples = sampling_rate * time_window  # number of samples in each time window
     last_window = -1  
 
     ############# Session is then initialized #######################

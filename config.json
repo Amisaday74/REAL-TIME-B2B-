@@ -1,5 +1,8 @@
 {
   "board_id": "SYNTHETIC_BOARD",
+  "test_duration_seconds": 60,
+  "timewindow_seconds": 4,
+  "channels_for_bispectrum": 2,
   "devices": [
     {
       "device_id": 1,
