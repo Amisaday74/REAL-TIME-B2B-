@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 #-------------------- CODE FOR EEG DEVICE CONNECTION AND DATA PROCESSING --------------------#
-def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, board_id, queue, event):
+def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, board_id, queue, event, completion_event):
 
     def write_ring(buffer, write_idx, lock, new_data):
         """
@@ -68,9 +68,11 @@ def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, bo
             """
             with second.get_lock():
                 current_second = second.value  # Make this function responsive to main timer updates
-                if(current_second >= 20):
-                    BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- End the session with {device_name} ---')
-                    break  # exit loop
+            
+            # Check if completion_event has been set by stopwatch (master controller)
+            if completion_event.is_set():
+                BoardShim.log_message(LogLevels.LEVEL_INFO.value, f' ---- End the session with {device_name} ---')
+                break  # exit loop when stopwatch reaches 20s
 
             current_window = current_second // time_window # Determine the current 4-second window 
             if current_window == last_window:

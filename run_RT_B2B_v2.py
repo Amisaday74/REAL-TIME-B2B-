@@ -31,7 +31,6 @@ with open('config.json', 'r') as config_file:
 # # Create a Value data object # #
 # This object can store a single integer and share it across multiple parallel processes
 seconds = Value("i", 0)
-counts = Value("i", 0)
 
 
 # Choose the board ID from config
@@ -117,16 +116,17 @@ if __name__ == '__main__':
     # Create events for synchronization
     event1 = Event()
     event2 = Event()
+    completion_event = Event()  # Event to signal when stopwatch reaches 20s
 
     q1 = Queue()
     q2 = Queue()
     graph_closed = threading.Event()
 
     # # Start processes # #
-    counter = Process(target=timer, args=[seconds, counts, timestamps])
-    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, device_1_name, board_id, q1, event1])
-    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, device_2_name, board_id, q2, event2])
-    bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2])
+    counter = Process(target=timer, args=[seconds, completion_event])
+    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, device_1_name, board_id, q1, event1, completion_event])
+    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, device_2_name, board_id, q2, event2, completion_event])
+    bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2, completion_event])
 
     counter.start()
     subject1.start()

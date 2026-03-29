@@ -4,7 +4,7 @@ from brainflow.board_shim import BoardShim, LogLevels
 
 # Finally, for both processes to run, this condition has to be met. Which is met
 # if you run the script.
-def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, eno2_lock, second, folder, event1, event2):
+def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, eno2_lock, second, folder, event1, event2, completion_event):
     def read_ring(buffer, write_idx, lock, window_size):
         """
         Returns last `window_size` samples as a stable copy
@@ -93,17 +93,22 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
             
 
             with second.get_lock():
-                # When the seconds reach 312, we exit the functions.
-                if(second.value >= 20):
-                    return
-                elif (second.value <= 8):
+                current_second = second.value
+                
+            # Check if completion_event has been set by stopwatch (master controller)
+            if completion_event.is_set():
+                return
+            
+            with second.get_lock():
+                # Phase-specific processing based on elapsed time
+                if (current_second <= 8):
                     #Get data to apply normalization
                     for i in range (1):
                         print('Preparing device calibration...')
                         df_eo = df_bispec
                         df_eo.to_csv('{}/Calibration_data.csv'.format(folder), mode='a')
 
-                elif ((second.value > 8) and (second.value <= 20)):
+                elif (current_second > 8):
                         #Create dataframes to estimate the eyes open mean matrix
 
                         sum = pd.read_csv('{}/Calibration_data.csv'.format(folder), index_col=0)
