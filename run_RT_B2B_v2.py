@@ -182,12 +182,12 @@ if __name__ == '__main__':
     if experiment_phase == "calibration":
         df_norm = np.zeros((bispectrum_length, N_CH*N_CH))
         #Create dataframes to estimate the eyes open mean matrix
-        sum = pd.read_csv('{}/Calibration_data.csv'.format(folder), index_col=0)
+        sum = pd.read_csv(f'{folder}/Bispectrum/Calibration_data.csv', index_col=0)
         arrange3 = sum.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True)
-        arrange3.to_csv('{}/Calibration_data_clean.csv'.format(folder))
+        arrange3.to_csv(f'{folder}/Bispectrum/Calibration_data_clean.csv')
 
             
-        eyes_open = pd.read_csv('{}/Calibration_data_clean.csv'.format(folder), index_col=0)
+        eyes_open = pd.read_csv(f'{folder}/Bispectrum/Calibration_data_clean.csv', index_col=0)
         
         df_eo = pd.DataFrame(eyes_open)
         divisor = len(df_eo)/bispectrum_length
@@ -205,6 +205,8 @@ if __name__ == '__main__':
                 # Sum the relevant values using NumPy's array operations
                 sum_values = np.sum([bis[key] for key in indices])
                 df_norm[i, int(comb)] = sum_values / divisor
+        comb_cols = [f'COMB{i}' for i in range(df_norm.shape[1])]
+        pd.DataFrame(df_norm, columns=comb_cols).to_csv(f'{folder}/Bispectrum/mean.csv', index=True, index_label='')
         print(df_norm)
 
     elif experiment_phase == "interaction":

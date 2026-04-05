@@ -79,7 +79,7 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
             df_bispec = pd.DataFrame(columns=['COMB' + str(channel) for channel in range(0, len(index))])
             for eeg_channel2 in range (0,4):
                 df_bispec['COMB' + str(eeg_channel2)] = b_transpose[eeg_channel2]
-            df_norm = np.zeros((len(df_bispec), N_CH*N_CH))
+            print(df_bispec)
             
             inspection = df_bispec.copy()
             # Add timestamp column
@@ -89,17 +89,16 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
             inspection['Timestamp'] = current_second
 
             if experiment_phase == "calibration":
-                inspection.to_csv('{}/Bispec_inspection.csv'.format(folder), mode='a')
-                df_bispec.to_csv('{}/Calibration_data.csv'.format(folder), mode='a')
+                inspection.to_csv(f'{folder}/Bispectrum/Bispec_inspection.csv', mode='a')
+                df_bispec.to_csv(f'{folder}/Bispectrum/Calibration_data.csv', mode='a')
             
             if experiment_phase == "interaction":
-                inspection.to_csv('{}/Bispec_inspection.csv'.format(folder), mode='a')
-                df_bispec.to_csv('{}/Bispec.csv'.format(folder), mode='a')
-                df_sum = pd.DataFrame(df_norm)
-
-                df_sum2 = df_sum.rename(columns={0: 'COMB0', 1: 'COMB1', 2: 'COMB2', 3: 'COMB3', 4: 'COMB4', 5: 'COMB5', 6: 'COMB6', 7: 'COMB7', 8: 'COMB8', 9: 'COMB9', 10: 'COMB10', 11: 'COMB11', 12: 'COMB12', 13: 'COMB13', 14: 'COMB14', 15: 'COMB15'})
-                df_sub = df_bispec.sub(df_sum2)
-                df_div = df_sub.div(df_sum2)
+                inspection.to_csv(f'{folder}/Bispectrum/Bispec_inspection.csv', mode='a')
+                df_bispec.to_csv(f'{folder}/Bispectrum/Interaction_data.csv', mode='a')
+                df_mean = pd.read_csv(f'{folder}/../Calibration_data/Bispectrum/mean.csv', index_col=0)
+                print(df_mean)
+                df_sub = df_bispec.sub(df_mean)
+                df_div = df_sub.div(df_mean)
                 print(df_div)
 
 
