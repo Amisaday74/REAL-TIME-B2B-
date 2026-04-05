@@ -41,6 +41,7 @@ sampling_rate = BoardShim.get_sampling_rate(board_id)
 test_duration = config['test_duration_seconds']
 timewindow = config['timewindow_seconds']
 bispectrum_channels = config['channels_for_bispectrum']
+experiment_phase = config['experiment_phase']
 
 def poll_queues(graph1, graph2, queues, device_1_name, device_2_name):
     for q in queues:
@@ -64,6 +65,7 @@ if __name__ == '__main__':
     BUFFER_SECONDS = 20
     BUFFER_LEN = sampling_rate * BUFFER_SECONDS
     N_CH = bispectrum_channels  # Number of channels to store (referenced electrodes)
+    bispectrum_length = sampling_rate * 2
 
     # -------------------------
     # Shared ring buffers
@@ -106,11 +108,14 @@ if __name__ == '__main__':
 
     dyad = f"{dyad:02d}"
     repetition_num = f"{repetition_num:02d}"
-    folder = f"experimental_results/Dyad{dyad}/R{repetition_num}_{datetime.now():%d%m%Y_%H%M}"
+    if experiment_phase == "calibration":
+        folder = f"experimental_results/Dyad{dyad}/Calibration_data"
+    elif experiment_phase == "interaction":
+        folder = f"experimental_results/Dyad{dyad}/R{repetition_num}_{datetime.now():%d%m%Y_%H%M}"
     os.makedirs(folder, exist_ok=True)
 
 
-    for subfolder in ['Real_Time_Data', 'Processed', 'Figures']:
+    for subfolder in ['Real_Time_Data', 'Bispectrum', 'Figures']:
         os.mkdir('{}/{}'.format(folder, subfolder))
 
     # # Create a multiprocessing List # # 
@@ -129,7 +134,7 @@ if __name__ == '__main__':
     counter = Process(target=timer, args=[seconds, completion_event, test_duration])
     subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, device_1_name, board_id, q1, event1, completion_event, timewindow])
     subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, device_2_name, board_id, q2, event2, completion_event, timewindow])
-    bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2, completion_event, bispectrum_channels])
+    bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2, completion_event, bispectrum_channels, experiment_phase])
 
     counter.start()
     subject1.start()
@@ -174,27 +179,56 @@ if __name__ == '__main__':
     print(Fore.RED + 'Test finished successfully, storing data now...' + Style.RESET_ALL)
     print(Fore.GREEN + 'Data has been stored successfully. Preparing bispectrum results...' + Style.RESET_ALL)
 
+    if experiment_phase == "calibration":
+        df_norm = np.zeros((bispectrum_length, N_CH*N_CH))
+        #Create dataframes to estimate the eyes open mean matrix
+        sum = pd.read_csv('{}/Calibration_data.csv'.format(folder), index_col=0)
+        arrange3 = sum.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True)
+        arrange3.to_csv('{}/Calibration_data_clean.csv'.format(folder))
 
-    # # POST REAL-TIME BISPECTRUM PLOTS SECTION # #
-    #Create dataframes for bispectrum results
-    data_meanb = pd.read_csv('{}/Frequency_bands_bispectrum.csv'.format(folder), index_col=0)
-    data_graph = data_meanb.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True)
-                        
-    df_graph = pd.DataFrame(data_graph)
-    # Replace -inf and inf with 0 in your DataFrame
-    data_graph = data_graph.replace([float('-inf'), float('inf')], 0)
-    print(df_graph)
-    # Generate a time index from 0 to test_duration seconds with the same length as your DataFrame
-    time_index = np.linspace(0, test_duration, len(data_graph))
-    for column in data_graph.columns:
-        plt.figure(figsize=(8, 6))
-        plt.plot(time_index, data_graph[column], label=column)
-        plt.title(f'Plot of {column}')
-        plt.xlabel('Time (s)')
-        plt.ylabel('Value')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(f'{folder}/Figures/{column}_plot.png')
+            
+        eyes_open = pd.read_csv('{}/Calibration_data_clean.csv'.format(folder), index_col=0)
+        
+        df_eo = pd.DataFrame(eyes_open)
+        divisor = len(df_eo)/bispectrum_length
+        df_eo2 = df_eo.rename(columns={'COMB0': 0, 'COMB1': 1, 'COMB2': 2, 'COMB3': 3, 'COMB4': 4, 'COMB5': 5, 'COMB6': 6, 'COMB7': '7', 'COMB8': 8, 'COMB9': 9, 'COMB10': 10, 'COMB11': 11, 'COMB12': 12, 'COMB13': 13, 'COMB14': 14, 'COMB15': 15})
+        dic_eo = df_eo2.to_dict('dict')
+
+
+        # Create an array to store the relevant keys
+        relevant_keys = np.arange(0, len(df_eo), bispectrum_length)
+        
+        for i in range(bispectrum_length):
+            for comb, bis in dic_eo.items():
+                # Calculate the indices to access values in bis
+                indices = relevant_keys + i
+                # Sum the relevant values using NumPy's array operations
+                sum_values = np.sum([bis[key] for key in indices])
+                df_norm[i, int(comb)] = sum_values / divisor
+        print(df_norm)
+
+    elif experiment_phase == "interaction":
+
+        # # POST REAL-TIME BISPECTRUM PLOTS SECTION # #
+        #Create dataframes for bispectrum results
+        data_meanb = pd.read_csv('{}/Frequency_bands_bispectrum.csv'.format(folder), index_col=0)
+        data_graph = data_meanb.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True)
+                            
+        df_graph = pd.DataFrame(data_graph)
+        # Replace -inf and inf with 0 in your DataFrame
+        data_graph = data_graph.replace([float('-inf'), float('inf')], 0)
+        print(df_graph)
+        # Generate a time index from 0 to test_duration seconds with the same length as your DataFrame
+        time_index = np.linspace(0, test_duration, len(data_graph))
+        for column in data_graph.columns:
+            plt.figure(figsize=(8, 6))
+            plt.plot(time_index, data_graph[column], label=column)
+            plt.title(f'Plot of {column}')
+            plt.xlabel('Time (s)')
+            plt.ylabel('Value')
+            plt.legend()
+            plt.grid(True)
+            plt.savefig(f'{folder}/Figures/{column}_plot.png')
 
 ####### Sources ########
 # To understand Value data type and lock method read the following link:
