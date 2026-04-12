@@ -62,10 +62,9 @@ if __name__ == '__main__':
     # Access to Manager to share memory between proccesses and acces dataframe's 
     mgr = Manager()
 
-    BUFFER_SECONDS = 20
-    BUFFER_LEN = sampling_rate * BUFFER_SECONDS
+    BUFFER_LEN = sampling_rate * timewindow * 3  # Buffer to store 3 time windows of data (e.g., 3000 data points for 12 seconds if timewindow is 4s and sampling_rate is 1000Hz)
     N_CH = bispectrum_channels  # Number of channels to store (referenced electrodes)
-    bispectrum_length = sampling_rate * 2
+    bispectrum_length = sampling_rate * timewindow // 2  # Length of bispectrum output (half the window size due to FFT symmetry)
 
     # -------------------------
     # Shared ring buffers

@@ -30,11 +30,14 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
 
         return data
     
-    WINDOW_SAMPLES = 1000
+    sampling_rate = 250 #Hz
+    timewindow = 4 #seconds
+    WINDOW_SAMPLES = sampling_rate * timewindow  # Number of samples in each time window (e.g., 1000 samples for 4 seconds if sampling_rate is 250Hz)
     N_CH = bispectrum_channels
     bispectrum_length = WINDOW_SAMPLES // 2# Get the first (and only) element from the lis
+    nyquist_freq = sampling_rate // 2
 
-    try:
+    try:        
         while (True):
             # Wait for both EEG devices to have data ready
             event1.wait()
@@ -43,19 +46,14 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
             # Read last 4 seconds of data from both devices
             # NumPy views (VERY IMPORTANT)
             eno1_buffer_np = np.frombuffer(eno1_buffer, dtype=np.float64).reshape(N_CH, -1)
-
             eno2_buffer_np = np.frombuffer(eno2_buffer, dtype=np.float64).reshape(N_CH, -1)
             eno1_window = read_ring(eno1_buffer_np, eno1_write_idx, eno1_lock, WINDOW_SAMPLES)
-
             eno2_window = read_ring(eno2_buffer_np, eno2_write_idx, eno2_lock, WINDOW_SAMPLES)
 
-            print(f"Memory ring buffer after read: {eno1_window}")
 
             # Shape: [samples, channels]
             matrix_eno1t = eno1_window.T
             matrix_eno2t = eno2_window.T
-            print(f"Showing data before bispectrum calculus{matrix_eno1t}")
-
 
             cont = 0
 
@@ -96,18 +94,16 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
                 inspection.to_csv(f'{folder}/Bispectrum/Bispec_inspection.csv', mode='a')
                 df_bispec.to_csv(f'{folder}/Bispectrum/Interaction_data.csv', mode='a')
                 df_mean = pd.read_csv(f'{folder}/../Calibration_data/Bispectrum/mean.csv', index_col=0)
-                print(df_mean)
                 df_sub = df_bispec.sub(df_mean)
                 df_div = df_sub.div(df_mean)
-                print(df_div)
 
 
                 #Get frequency bands to apply in bispectrum matrix normalized
-                delta_limit = (4 * len(df_bispec)) // 125 #125Hz is the frequency limit to the bispectrum matrix length data
-                theta_limit = (8 * len(df_bispec)) // 125
-                alpha_limit = (13 * len(df_bispec)) // 125
-                beta_limit = (29 * len(df_bispec)) // 125
-                gamma_limit = (50 * len(df_bispec)) // 125
+                delta_limit = (4 * len(df_bispec)) // nyquist_freq #125Hz is the frequency limit to the bispectrum matrix length data
+                theta_limit = (8 * len(df_bispec)) // nyquist_freq
+                alpha_limit = (13 * len(df_bispec)) // nyquist_freq
+                beta_limit = (29 * len(df_bispec)) // nyquist_freq
+                gamma_limit = (50 * len(df_bispec)) // nyquist_freq
                 
 
                 df_delta = df_div.iloc[0:delta_limit, :].mean(axis=0)
@@ -115,7 +111,6 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
                 df_alpha = df_div.iloc[theta_limit:alpha_limit, :].mean(axis=0)
                 df_beta = df_div.iloc[alpha_limit:beta_limit, :].mean(axis=0)
                 df_gamma = df_div.iloc[beta_limit:gamma_limit, :].mean(axis=0)
-                print(df_gamma)
 
                 # Concatenate the individual DataFrames horizontally (column-wise)
                 result_df = pd.concat([df_delta, df_theta, df_alpha, df_beta, df_gamma], axis=0)
