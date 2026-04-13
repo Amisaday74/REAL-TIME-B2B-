@@ -133,7 +133,7 @@ if __name__ == '__main__':
     counter = Process(target=timer, args=[seconds, completion_event, test_duration])
     subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, device_1_name, board_id, q1, event1, completion_event, timewindow])
     subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, device_2_name, board_id, q2, event2, completion_event, timewindow])
-    bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2, completion_event, bispectrum_channels, experiment_phase])
+    bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2, completion_event, bispectrum_channels, experiment_phase, sampling_rate, timewindow])
 
     counter.start()
     subject1.start()
@@ -181,22 +181,21 @@ if __name__ == '__main__':
     if experiment_phase == "calibration":
         df_norm = np.zeros((bispectrum_length, N_CH*N_CH))
         #Create dataframes to estimate the eyes open mean matrix
-        sum = pd.read_csv(f'{folder}/Bispectrum/Calibration_data.csv', index_col=0)
-        arrange3 = sum.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True)
-        arrange3.to_csv(f'{folder}/Bispectrum/Calibration_data_clean.csv')
+        sum = pd.read_csv(f'{folder}/Bispectrum/Calibration_data.csv', index_col=0, usecols=lambda x: x != 'Timestamp')
+        arrange = sum.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True)
+        arrange.to_csv(f'{folder}/Bispectrum/Nested_loops.csv')
 
-            
-        eyes_open = pd.read_csv(f'{folder}/Bispectrum/Calibration_data_clean.csv', index_col=0)
-        
-        df_eo = pd.DataFrame(eyes_open)
+
+        eyes_open = pd.read_csv(f'{folder}/Bispectrum/Nested_loops.csv', index_col=0)
+        df_eo = pd.DataFrame(eyes_open).rename(columns={f'COMB{i+1}': i for i in range(df_norm.shape[1])})
         divisor = len(df_eo)/bispectrum_length
-        df_eo2 = df_eo.rename(columns={'COMB0': 0, 'COMB1': 1, 'COMB2': 2, 'COMB3': 3, 'COMB4': 4, 'COMB5': 5, 'COMB6': 6, 'COMB7': '7', 'COMB8': 8, 'COMB9': 9, 'COMB10': 10, 'COMB11': 11, 'COMB12': 12, 'COMB13': 13, 'COMB14': 14, 'COMB15': 15})
-        dic_eo = df_eo2.to_dict('dict')
+        dic_eo = df_eo.to_dict('dict')
 
 
         # Create an array to store the relevant keys
         relevant_keys = np.arange(0, len(df_eo), bispectrum_length)
         
+        #Nested loops to sum the relevant values for each combination and store the mean bispectrum in a dataframe
         for i in range(bispectrum_length):
             for comb, bis in dic_eo.items():
                 # Calculate the indices to access values in bis
@@ -204,15 +203,15 @@ if __name__ == '__main__':
                 # Sum the relevant values using NumPy's array operations
                 sum_values = np.sum([bis[key] for key in indices])
                 df_norm[i, int(comb)] = sum_values / divisor
-        comb_cols = [f'COMB{i}' for i in range(df_norm.shape[1])]
-        pd.DataFrame(df_norm, columns=comb_cols).to_csv(f'{folder}/Bispectrum/mean.csv', index=True, index_label='')
-        print(df_norm)
+        comb_cols = [f'COMB{i}' for i in range(1, df_norm.shape[1] + 1)]
+        pd.DataFrame(df_norm, columns=comb_cols).to_csv(f'{folder}/Bispectrum/Mean.csv', index=True, index_label='')
+        print(Fore.GREEN + f'Mean bispectrum has been stored successfully in {folder}/Bispectrum/Mean.csv.' + Style.RESET_ALL)
 
     elif experiment_phase == "interaction":
 
         # # POST REAL-TIME BISPECTRUM PLOTS SECTION # #
         #Create dataframes for bispectrum results
-        data_meanb = pd.read_csv('{}/Frequency_bands_bispectrum.csv'.format(folder), index_col=0)
+        data_meanb = pd.read_csv(f'{folder}/Bispectrum/Frequency_bands_bispectrum.csv', index_col=0)
         data_graph = data_meanb.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True)
                             
         df_graph = pd.DataFrame(data_graph)
@@ -232,8 +231,9 @@ if __name__ == '__main__':
             plt.savefig(f'{folder}/Figures/{column}_plot.png')
 
 ####### Sources ########
-# To understand Value data type and lock method read the following link:
-# https://www.kite.com/python/docs/multiprocessing.Value  
-# For suffle of array, check the next link and user "mdml" answer:
-# https://stackoverflow.com/questions/19597473/binary-random-array-with-a-specific-proportion-of-ones
+# To understand the methods and structure of this code, visit the following sources:
+# - BrainFlow documentation: https://brainflow.readthedocs.io/en/stable/
+# - PyQt5 documentation: https://www.riverbankcomputing.com/static/Docs/PyQt5/
+# - Python multiprocessing documentation: https://docs.python.org/3/library/multiprocessing.html
+# - Published article: https://doi.org/10.3390/s24061776
 

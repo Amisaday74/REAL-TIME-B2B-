@@ -1,10 +1,9 @@
 import numpy as np
 import pandas as pd
-from brainflow.board_shim import BoardShim, LogLevels
 
 # Finally, for both processes to run, this condition has to be met. Which is met
 # if you run the script.
-def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, eno2_lock, second, folder, event1, event2, completion_event, bispectrum_channels, experiment_phase):
+def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, eno2_lock, second, folder, event1, event2, completion_event, bispectrum_channels, experiment_phase, sampling_rate, timewindow):
     def read_ring(buffer, write_idx, lock, window_size):
         """
         Returns last `window_size` samples as a stable copy
@@ -18,7 +17,6 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
 
             if start < idx:
                 data = buffer[:, start:idx]
-                print(f"Reading data from ring buffer from index {start} to {idx}: {data}")
             else:
                 data = np.hstack((
                     buffer[:, start:],
@@ -30,12 +28,10 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
 
         return data
     
-    sampling_rate = 250 #Hz
-    timewindow = 4 #seconds
     WINDOW_SAMPLES = sampling_rate * timewindow  # Number of samples in each time window (e.g., 1000 samples for 4 seconds if sampling_rate is 250Hz)
     N_CH = bispectrum_channels
-    bispectrum_length = WINDOW_SAMPLES // 2# Get the first (and only) element from the lis
-    nyquist_freq = sampling_rate // 2
+    bispectrum_length = WINDOW_SAMPLES // 2
+    nyquist_freq = sampling_rate // 2 
 
     try:        
         while (True):
@@ -67,39 +63,35 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
                     B[cont, :] = np.log(bs[:len(bs)//2].T)  # Mean windows bs on all channels
                     index[cont, :] = [ch1+1, ch2+1]  # Indexing combination order: ch1,ch2
                     cont += 1
-            print(B)
             
             
             bispectrum = pd.DataFrame(B)
             b_transpose = bispectrum.transpose()
 
 
-            df_bispec = pd.DataFrame(columns=['COMB' + str(channel) for channel in range(0, len(index))])
-            for eeg_channel2 in range (0,4):
-                df_bispec['COMB' + str(eeg_channel2)] = b_transpose[eeg_channel2]
+            df_bispec = pd.DataFrame(columns=['COMB' + str(channel) for channel in range(1, len(index) + 1)])
+            for bispectrum_channel in range (1, len(index) + 1):
+                df_bispec['COMB' + str(bispectrum_channel)] = b_transpose[bispectrum_channel - 1]
             print(df_bispec)
             
-            inspection = df_bispec.copy()
             # Add timestamp column
             current_second = None
             with second.get_lock():
                 current_second = second.value
-            inspection['Timestamp'] = current_second
+            df_bispec['Timestamp'] = current_second
 
             if experiment_phase == "calibration":
-                inspection.to_csv(f'{folder}/Bispectrum/Bispec_inspection.csv', mode='a')
                 df_bispec.to_csv(f'{folder}/Bispectrum/Calibration_data.csv', mode='a')
             
             if experiment_phase == "interaction":
-                inspection.to_csv(f'{folder}/Bispectrum/Bispec_inspection.csv', mode='a')
                 df_bispec.to_csv(f'{folder}/Bispectrum/Interaction_data.csv', mode='a')
-                df_mean = pd.read_csv(f'{folder}/../Calibration_data/Bispectrum/mean.csv', index_col=0)
-                df_sub = df_bispec.sub(df_mean)
+                df_mean = pd.read_csv(f'{folder}/../Calibration_data/Bispectrum/Mean.csv', index_col=0)
+                df_sub = df_bispec.drop('Timestamp', axis=1).sub(df_mean)
                 df_div = df_sub.div(df_mean)
 
 
                 #Get frequency bands to apply in bispectrum matrix normalized
-                delta_limit = (4 * len(df_bispec)) // nyquist_freq #125Hz is the frequency limit to the bispectrum matrix length data
+                delta_limit = (4 * len(df_bispec)) // nyquist_freq 
                 theta_limit = (8 * len(df_bispec)) // nyquist_freq
                 alpha_limit = (13 * len(df_bispec)) // nyquist_freq
                 beta_limit = (29 * len(df_bispec)) // nyquist_freq
@@ -126,13 +118,13 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
 
                 # Loop through the combination numbers and frequency bands to create new column names
                 for band in frequency_bands:
-                    for comb_num in range(1,5):
+                    for comb_num in range(1, len(index) + 1):
                         new_column_names.append(f'COMB{comb_num}_{band}')
 
                 # Assign the new column names to the DataFrame
                 bispectrum_mean.columns = new_column_names
 
-                bispectrum_mean.to_csv('{}/Frequency_bands_bispectrum.csv'.format(folder), mode='a')
+                bispectrum_mean.to_csv(f'{folder}/Bispectrum/Frequency_bands_bispectrum.csv', mode='a')
                 print(bispectrum_mean)
 
             # Clear events for next iteration
@@ -143,4 +135,4 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
                 return
 
     except KeyboardInterrupt:
-        BoardShim.log_message(LogLevels.LEVEL_INFO.value, ' ---- Ending bispectrum analysis ---')
+        print(' ---- Ending bispectrum analysis ---')
