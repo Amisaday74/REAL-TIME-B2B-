@@ -247,6 +247,7 @@ if __name__ == '__main__':
             plt.legend()
             plt.grid(True)
             plt.savefig(f'{folder}/Figures/{column}_plot.png')
+            plt.close()
 
 ####### Sources ########
 # To understand the methods and structure of this code, visit the following sources:

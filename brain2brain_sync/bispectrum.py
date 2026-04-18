@@ -68,10 +68,9 @@ def bispec(eno1_buffer, eno1_write_idx, eno1_lock, eno2_buffer, eno2_write_idx, 
             bispectrum = pd.DataFrame(B)
             b_transpose = bispectrum.transpose()
 
-
-            df_bispec = pd.DataFrame(columns=['COMB' + str(channel) for channel in range(1, len(index) + 1)])
-            for bispectrum_channel in range (1, len(index) + 1):
-                df_bispec['COMB' + str(bispectrum_channel)] = b_transpose[bispectrum_channel - 1]
+            # Construct DataFrame efficiently all at once
+            df_bispec = b_transpose.copy()
+            df_bispec.columns = ['COMB' + str(channel) for channel in range(1, len(index) + 1)]
             print(df_bispec)
             
             # Add timestamp column
