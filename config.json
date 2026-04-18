@@ -2,8 +2,8 @@
   "board_id": "SYNTHETIC_BOARD",
   "test_duration_seconds": 20,
   "timewindow_seconds": 4,
-  "channels_for_bispectrum": 2,
-  "experiment_phase": "calibration",
+  "reference_channels": ["CH1", "CH2"],
+  "experiment_phase": "interaction",
   "devices": [
     {
       "device_id": 1,

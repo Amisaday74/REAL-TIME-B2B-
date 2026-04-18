@@ -10,6 +10,7 @@ import os
 import json
 from datetime import datetime
 from colorama import Fore, Style
+import shutil
 
 # Imports for outliers removal and data plotting (no real-time)
 import numpy as np
@@ -40,8 +41,8 @@ eeg_channels = BoardShim.get_eeg_channels(board_id)
 sampling_rate = BoardShim.get_sampling_rate(board_id)
 test_duration = config['test_duration_seconds']
 timewindow = config['timewindow_seconds']
-bispectrum_channels = config['channels_for_bispectrum']
 experiment_phase = config['experiment_phase']
+reference_channels = config['reference_channels']
 
 def poll_queues(graph1, graph2, queues, device_1_name, device_2_name):
     for q in queues:
@@ -63,14 +64,14 @@ if __name__ == '__main__':
     mgr = Manager()
 
     BUFFER_LEN = sampling_rate * timewindow * 3  # Buffer to store 3 time windows of data (e.g., 3000 data points for 12 seconds if timewindow is 4s and sampling_rate is 1000Hz)
-    N_CH = bispectrum_channels  # Number of channels to store (referenced electrodes)
+    bispectrum_channels = len(eeg_channels) - len(reference_channels)  # Number of channels to store (referenced electrodes)
     bispectrum_length = sampling_rate * timewindow // 2  # Length of bispectrum output (half the window size due to FFT symmetry)
 
     # -------------------------
     # Shared ring buffers
     # -------------------------
-    eno1_buffer_raw = Array('d', N_CH * BUFFER_LEN, lock=False)
-    eno2_buffer_raw = Array('d', N_CH * BUFFER_LEN, lock=False)
+    eno1_buffer_raw = Array('d', bispectrum_channels * BUFFER_LEN, lock=False)
+    eno2_buffer_raw = Array('d', bispectrum_channels * BUFFER_LEN, lock=False)
 
     # Write indices
     eno1_write_idx = Value('i', 0)
@@ -128,7 +129,6 @@ if __name__ == '__main__':
         except FileExistsError:
             response = input(f"Subfolder {subfolder} already exists in {folder}. Overwrite? (y/n): ")
             if response.lower() == 'y':
-                import shutil
                 shutil.rmtree(subfolder_path)
                 os.mkdir(subfolder_path)
             else:
@@ -149,8 +149,8 @@ if __name__ == '__main__':
 
     # # Start processes # #
     counter = Process(target=timer, args=[seconds, completion_event, test_duration])
-    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, device_1_name, board_id, q1, event1, completion_event, timewindow])
-    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, device_2_name, board_id, q2, event2, completion_event, timewindow])
+    subject1 = Process(target=EEG, args=[seconds, folder, eno1_buffer_raw, eno1_write_idx, eno1_lock, mac1, device_1_name, board_id, q1, event1, completion_event, timewindow, reference_channels])
+    subject2 = Process(target=EEG, args=[seconds, folder, eno2_buffer_raw, eno2_write_idx, eno2_lock, mac2, device_2_name, board_id, q2, event2, completion_event, timewindow, reference_channels])
     bispectrum = Process(target=bispec, args=[eno1_buffer_raw, eno1_write_idx, eno1_lock, eno2_buffer_raw, eno2_write_idx, eno2_lock, seconds, folder, event1, event2, completion_event, bispectrum_channels, experiment_phase, sampling_rate, timewindow])
 
     counter.start()
@@ -197,7 +197,7 @@ if __name__ == '__main__':
     print(Fore.GREEN + 'Data has been stored successfully. Preparing bispectrum results...' + Style.RESET_ALL)
 
     if experiment_phase == "calibration":
-        df_norm = np.zeros((bispectrum_length, N_CH*N_CH))
+        df_norm = np.zeros((bispectrum_length, bispectrum_channels*bispectrum_channels))
         #Create dataframes to estimate the eyes open mean matrix
         sum = pd.read_csv(f'{folder}/Bispectrum/Calibration_data.csv', index_col=0, usecols=lambda x: x != 'Timestamp')
         arrange = sum.apply(pd.to_numeric, errors='coerce').dropna(axis=0).reset_index(drop=True)

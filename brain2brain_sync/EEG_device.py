@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 #-------------------- CODE FOR EEG DEVICE CONNECTION AND DATA PROCESSING --------------------#
-def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, board_id, queue, event, completion_event, timewindow):
+def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, board_id, queue, event, completion_event, timewindow, reference_channels):
 
     def write_ring(buffer, write_idx, lock, new_data):
         """
@@ -110,18 +110,20 @@ def EEG(second, folder, buffer_np, write_idx, lock, mac_address, device_name, bo
             # Send data to the graph in the background if it is still open
             queue.put((device_name, raw_data, data))
             
-            # Calculate the new variable based on the formula
+            # Calculate the average reference from reference channels
+            ref_average = df_signal[reference_channels].mean(axis=1)
+            
+            # Calculate referenced electrodes for all non-reference channels
             referenced_electrodes = pd.DataFrame()
-            referenced_electrodes['referenced_electrode1'] = df_signal['CH3'] - ((df_signal['CH1'] + df_signal['CH2']) / 2)
-            referenced_electrodes['referenced_electrode2'] = df_signal['CH4'] - ((df_signal['CH1'] + df_signal['CH2']) / 2)
-
-            # Write to ring buffer
-            ring_block = np.vstack([
-                referenced_electrodes['referenced_electrode1'].values,
-                referenced_electrodes['referenced_electrode2'].values
-            ])
+            for eeg_channel in eeg_channels:
+                ch_label = 'CH' + str(eeg_channel)
+                if ch_label not in reference_channels:
+                    referenced_electrodes[ch_label] = df_signal[ch_label] - ref_average
+            
+            # Write to ring buffer - all referenced channels
+            ring_block = referenced_electrodes.values.T
             # NumPy views (VERY IMPORTANT)
-            buffer_np = np.frombuffer(buffer_np, dtype=np.float64).reshape(2, -1)
+            buffer_np = np.frombuffer(buffer_np, dtype=np.float64).reshape(len(referenced_electrodes.columns), -1)
 
             write_ring(buffer_np, write_idx, lock, ring_block)
 
