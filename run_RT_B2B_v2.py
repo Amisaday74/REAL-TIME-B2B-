@@ -107,15 +107,33 @@ if __name__ == '__main__':
 
     dyad = f"{dyad:02d}"
     repetition_num = f"{repetition_num:02d}"
+    calibration_folder = f"experimental_results/Dyad{dyad}/Calibration_data"
+    calibration_file = f"{calibration_folder}/Bispectrum/Mean.csv"
     if experiment_phase == "calibration":
-        folder = f"experimental_results/Dyad{dyad}/Calibration_data"
+        if os.path.exists(calibration_file):
+            print("Warning: Calibration data already exists. Running calibration again will overwrite it.")
+        folder = calibration_folder
     elif experiment_phase == "interaction":
+        if not os.path.exists(calibration_file):
+            print("Error: Calibration data not found. Please run in calibration mode first to generate the required data.")
+            sys.exit(1)
         folder = f"experimental_results/Dyad{dyad}/R{repetition_num}_{datetime.now():%d%m%Y_%H%M}"
     os.makedirs(folder, exist_ok=True)
 
 
     for subfolder in ['Real_Time_Data', 'Bispectrum', 'Figures']:
-        os.mkdir('{}/{}'.format(folder, subfolder))
+        subfolder_path = '{}/{}'.format(folder, subfolder)
+        try:
+            os.mkdir(subfolder_path)
+        except FileExistsError:
+            response = input(f"Subfolder {subfolder} already exists in {folder}. Overwrite? (y/n): ")
+            if response.lower() == 'y':
+                import shutil
+                shutil.rmtree(subfolder_path)
+                os.mkdir(subfolder_path)
+            else:
+                print(f"Cannot proceed without overwriting {subfolder}. Exiting.")
+                sys.exit(1)
 
     # # Create a multiprocessing List # # 
     timestamps = Manager().list()

@@ -3,7 +3,7 @@
   "test_duration_seconds": 20,
   "timewindow_seconds": 4,
   "channels_for_bispectrum": 2,
-  "experiment_phase": "interaction",
+  "experiment_phase": "calibration",
   "devices": [
     {
       "device_id": 1,
