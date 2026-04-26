@@ -44,6 +44,12 @@ timewindow = config['timewindow_seconds']
 experiment_phase = config['experiment_phase']
 reference_channels = config['reference_channels']
 
+# Validate that test_duration is a multiple of timewindow
+if test_duration % timewindow != 0:
+    print(Fore.RED + f"Error: test_duration ({test_duration}s) must be a multiple of timewindow ({timewindow}s)." + Style.RESET_ALL)
+    print(f"Valid combinations: timewindow={timewindow}s → test_duration can be {timewindow}, {timewindow*2}, {timewindow*3}, {timewindow*4}, {timewindow*5}, ...")
+    sys.exit(1)
+
 def poll_queues(graph1, graph2, queues, device_1_name, device_2_name):
     for q in queues:
         while not q.empty():
@@ -92,6 +98,14 @@ if __name__ == '__main__':
     # # Define the data folder # #
     # The name of the folder is defined depending on the user's input
 
+    # Validate experiment_phase from config
+    valid_phases = ["calibration", "interaction"]
+    if experiment_phase not in valid_phases:
+        print(Fore.RED + f"Error: Invalid experiment_phase '{experiment_phase}' in config.json." + Style.RESET_ALL)
+        print(f"Valid options are: {', '.join(valid_phases)}")
+        sys.exit(1)
+
+    # Ask for dyad number (required for both phases)
     while True:
         try:
             dyad = int(input("Please write the assigned number for the dyad under analysis: "))
@@ -100,7 +114,7 @@ if __name__ == '__main__':
         except ValueError:
             print("Invalid input. Please enter a whole number (integer).")
 
-    # Only ask for repetition number when in interaction phase
+    # Ask for repetition number only in interaction phase
     if experiment_phase == "interaction":
         while True:
             try:
@@ -109,17 +123,16 @@ if __name__ == '__main__':
                 break
             except ValueError:
                 print("Invalid input. Please enter a whole number (integer).")
-    else:
-        repetition_num = "00"  # Default value for calibration phase
+
     calibration_folder = f"experimental_results/Dyad{dyad}/Calibration_data"
     calibration_file = f"{calibration_folder}/Bispectrum/Mean.csv"
     if experiment_phase == "calibration":
         if os.path.exists(calibration_file):
-            print("Warning: Calibration data already exists. Running calibration again will overwrite it.")
+            print(Fore.YELLOW + "Warning: Calibration data already exists. Running calibration again will overwrite it." + Style.RESET_ALL)
         folder = calibration_folder
     elif experiment_phase == "interaction":
         if not os.path.exists(calibration_file):
-            print("Error: Calibration data not found. Please run in calibration mode first to generate the required data.")
+            print(Fore.RED + "Error: Calibration data not found. Please run in calibration mode first to generate the required data." + Style.RESET_ALL)
             sys.exit(1)
         folder = f"experimental_results/Dyad{dyad}/Record{repetition_num}_{datetime.now():%d%m%Y_%H%M}"
     os.makedirs(folder, exist_ok=True)
@@ -196,8 +209,7 @@ if __name__ == '__main__':
 
     # # DATA STORAGE SECTION # #
     # Executed only once the test has finished.
-    print(Fore.RED + 'Test finished successfully, storing data now...' + Style.RESET_ALL)
-    print(Fore.GREEN + 'Data has been stored successfully. Preparing bispectrum results...' + Style.RESET_ALL)
+    print(Fore.BLUE + 'Test finished successfully, storing data now...' + Style.RESET_ALL)
 
     if experiment_phase == "calibration":
         df_norm = np.zeros((bispectrum_length, bispectrum_channels*bispectrum_channels))
@@ -226,10 +238,11 @@ if __name__ == '__main__':
                 df_norm[i, int(comb)] = sum_values / divisor
         comb_cols = [f'COMB{i}' for i in range(1, df_norm.shape[1] + 1)]
         pd.DataFrame(df_norm, columns=comb_cols).to_csv(f'{folder}/Bispectrum/Mean.csv', index=True, index_label='')
-        print(Fore.GREEN + f'Mean bispectrum has been stored successfully in {folder}/Bispectrum/Mean.csv.' + Style.RESET_ALL)
+        print(Fore.GREEN + f'SUCCESS: Bispectrum results have been stored successfully in {folder}' + Style.RESET_ALL)
 
     elif experiment_phase == "interaction":
-
+        print(Fore.GREEN + f'SUCCESS: Bispectrum results have been stored successfully in {folder}' + Style.RESET_ALL)
+        print(Fore.YELLOW + 'WARNING: Preparing offline bispectrum plots... This may take a while depending on the number of channels.' + Style.RESET_ALL)
         # # POST REAL-TIME BISPECTRUM PLOTS SECTION # #
         #Create dataframes for bispectrum results
         data_meanb = pd.read_csv(f'{folder}/Bispectrum/Frequency_bands_bispectrum.csv', index_col=0)
@@ -251,6 +264,7 @@ if __name__ == '__main__':
             plt.grid(True)
             plt.savefig(f'{folder}/Figures/{column}_plot.png')
             plt.close()
+        print(Fore.GREEN + f'SUCCESS: Bispectrum plots are now available in {folder}/Figures' + Style.RESET_ALL)
 
 ####### Sources ########
 # To understand the methods and structure of this code, visit the following sources:
