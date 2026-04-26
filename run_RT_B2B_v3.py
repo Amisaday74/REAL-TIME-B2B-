@@ -95,19 +95,22 @@ if __name__ == '__main__':
     while True:
         try:
             dyad = int(input("Please write the assigned number for the dyad under analysis: "))
+            dyad = f"{dyad:02d}"  # Convert to string with padding
             break  # exit loop if input is valid
         except ValueError:
             print("Invalid input. Please enter a whole number (integer).")
 
-    while True:
-        try:
-            repetition_num = int(input("Enter the iteration number of the current experimental test: "))
-            break
-        except ValueError:
-            print("Invalid input. Please enter a whole number (integer).")
-
-    dyad = f"{dyad:02d}"
-    repetition_num = f"{repetition_num:02d}"
+    # Only ask for repetition number when in interaction phase
+    if experiment_phase == "interaction":
+        while True:
+            try:
+                repetition_num = int(input("Enter the iteration number of the current experimental test: "))
+                repetition_num = f"{repetition_num:02d}"  # Convert to string with padding
+                break
+            except ValueError:
+                print("Invalid input. Please enter a whole number (integer).")
+    else:
+        repetition_num = "00"  # Default value for calibration phase
     calibration_folder = f"experimental_results/Dyad{dyad}/Calibration_data"
     calibration_file = f"{calibration_folder}/Bispectrum/Mean.csv"
     if experiment_phase == "calibration":
@@ -118,7 +121,7 @@ if __name__ == '__main__':
         if not os.path.exists(calibration_file):
             print("Error: Calibration data not found. Please run in calibration mode first to generate the required data.")
             sys.exit(1)
-        folder = f"experimental_results/Dyad{dyad}/R{repetition_num}_{datetime.now():%d%m%Y_%H%M}"
+        folder = f"experimental_results/Dyad{dyad}/Record{repetition_num}_{datetime.now():%d%m%Y_%H%M}"
     os.makedirs(folder, exist_ok=True)
 
 

@@ -11,6 +11,183 @@ This repository hosts a Python-based real-time algorithm that estimates brain-to
 
 ---
 
+## Features
+
+Real-time EEG preprocessing: including filtering and artifact handling via Python.
+Bispectrum-based synchrony estimation: efficient inter-brain coupling metric using bispectrum analysis.
+Multiprocessing support: enables concurrent real-time processing of signals from two EEG sources.
+Application contexts:
+Collaborative tasks (e.g., puzzle solving)—demonstrated to yield significantly higher B2B synchrony.
+Competitive tasks (e.g., one-on-one games)—provides a meaningful comparison benchmark.
+Statistical validation: detrends differences using a Wilcoxon rank-sum test; 33.75% of comparisons achieved statistical significance.
+Versatile use cases: Designed for neuroeducation, but easily adaptable to classrooms, industry, and varied EEG hardware setups.
+
+---
+
+## Repository Structure
+
+├── brain2brain_sync/        # Python module containing core logic
+│   ├── __init__.py
+│   ├── EEG_device.py        # connection, filters, EEG timewindows handling
+│   ├── bispectrum.py        # bispectrum extraction logic
+│   ├── graphs.py            # real-time data graphs
+│   └── stopwatch.py         # counter for master control
+├── experimental_resuts      # Folder created during runtime execution to store data (local)
+├── tests/
+│   └── test_bispectrum.py   # Unit tests module
+├── config.json              # File containing editable data to setup the experiment
+├── run_RT_B2B_v3.py         # Main script to run the experiment using multiprocessing
+├── requirements.txt         # Dependencies for reproducibility
+├── environment.yml          # (Optional) conda environment spec
+├── LICENSE                  # CC (Creative Commons) 
+├── README.md                # This file
+├── CITATION.cff             # Citation file for GitHub integration
+└── .gitignore
+
+---
+
+## Installation
+
+git clone https://github.com/<your_username>/<your_repo>.git
+cd <your_repo>
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+Optionally, if using conda:
+conda env create -f environment.yml
+conda activate <env_name>
+
+---
+
+## Usage
+
+In config.json you will find up the varaibles to adapt the execution of the algorithm to your necessitites
+  "board_id"                - Writte here the name of any of the available boards in Brainflow: https://brainflow.readthedocs.io/en/stable/SupportedBoards.html
+  "test_duration_seconds"   - Duration in seconds of your experiment. This is the total time that the algorith will be operating.
+  "timewindow_seconds"      - Duration in seconds of every timewindow. This number must be a multiple of "test_duration_seconds" to avoid missalignments and lost data.
+  "reference_channels"      - A list containing all the channels that must be considered as reference. The script will calculate the average of all the selected channels
+  "experiment_phase"        - Variable to select the mode of execution. Either calibration or interaction
+  "devices"                 - A dictionary with relevant data for both devices intended to be connected
+
+# Example: Calibration mode
+If it's your first time running the algorithm ever, you always need to run first a session with "experiment_phase" setted as "calibration", this is what will allow to have a database for future records.
+In this example config.json is adapted to extract data from the ENOPHONES every four seconds for one minute in "calibration" mode.
+{
+  "board_id": "ENOPHONE_BOARD",   
+  "test_duration_seconds": 60,
+  "timewindow_seconds": 4,
+  "reference_channels": ["CH1", "CH2"],
+  "experiment_phase": "calibration",
+  "devices": [
+    {
+      "device_id": 1,
+      "device_name": "Device_1",
+      "user": "User_1",
+      "mac_address": "11:22:33:44:55:66"
+    },
+    {
+      "device_id": 2,
+      "device_name": "Device_2",
+      "user": "User_2",
+      "mac_address": "aa:bb:cc:dd:ee:ff"
+    }
+  ]
+}
+
+After saving your specific configuration, execute run_RT_B2B_v3.py to store calibration data for the first time. 
+Inside the script logic, everytime run_RT_B2B_v3.py is running, the user is asked for one input:
+
+> terminal: Please write the assigned number for the dyad under analysis:  <---- Write here an integer
+
+The experimetal design of this algorithm is suited to assign a number for every dyad, this is what will keep different adn well organized folders for every pair of subjects inside the folder "experimental_results". You can rerun the algorithm with the same "experiment_phase" and integer input to overwritte "calibration" results for the same dyad.
+
+# Example: Interaction mode
+Once calibration data is stored, the script is ready to record as many experimental sessions as needed. For example, in case you need to estimate brain-to-brain synchrony in a 10 minutes interactive session, keep the same value in "timewindow_seconds" as the one selected in calibration mode and write the number of seconds you would like to record data in "test_duration_seconds". After that set "experiment_phase" as "interaction".
+{
+  "board_id": "ENOHONE_BOARD",   
+  "test_duration_seconds": 600,
+  "timewindow_seconds": 4,
+  "reference_channels": ["CH1", "CH2"],
+  "experiment_phase": "interaction",
+  "devices": [
+    {
+      "device_id": 1,
+      "device_name": "Device_1",
+      "user": "User_1",
+      "mac_address": "11:22:33:44:55:66"
+    },
+    {
+      "device_id": 2,
+      "device_name": "Device_2",
+      "user": "User_2",
+      "mac_address": "aa:bb:cc:dd:ee:ff"
+    }
+  ]
+}
+
+Execute run_RT_B2B_v3.py to start the analysis as many times you want. This time, the script will ask for two inputs at the beggining:
+
+> terminal: Please write the assigned number for the dyad under analysis:  <---- Write here an integer
+
+> terminal: Enter the iteration number of the current experimental test:  <---- Write here an integer
+
+Keep writting the same number for the dyad being analyzed in the first input. Start writting 1 in the second input and increment this number by one everytime you start a new record session.
+
+---
+
+## Results and Validation
+
+Collected data in real-time is stored in the following subfolders:
+
+├── experimental_results/       
+│   └── Dyad01/ 
+│       ├── Calibration_data/        
+│       └── Record01_StartDatetime  
+│           ├── Bispectrum             
+│           ├── Figures        
+│           └── Real_time_data    
+
+In "calibration" mode, the Bispectrum folder stores the following files:
+Calibration_data.csv      - Main bispectrum results       
+Nested_loops.csv          - Data arrange to calculate mean bispectrum
+Mean.csv                  - Final mean matrix of bisprectrum results
+
+In "interaction" mode, the Bispectrum folder stores the following files:
+Interaction_data.csv               - Main bispectrum results       
+Frequency_bands_bispectrum.csv     - Average normalized bisprectum per timewindow grouped by frequency bands
+
+Data contained inside Real_time_data
+Device_1_raw_data                  - Raw EEG from subject 1 (samples x channels) + Timestamps column
+Device_1_signal_processing         - Preprocessed EEG signal from subject 1 (samples x channels)
+Device_2_raw_data                  - Raw EEG from subject 2 (samples x channels) + Timestamps column
+Device_2_signal_processing         - Preprocessed EEG signal from subject 2 (samples x channels)
+
+Data contained inside Figures
+Offline plotting of Frequency_bands_bispectrum.csv
+
+Results from the pusblished article can be found at branch "rel/B2B_algorithm_v1". 
+- Collaborative (puzzle-solving) tasks consistently produced higher bispectral synchrony than competitive ones.
+- A Wilcoxon rank-sum test confirmed statistical significance in ~33.75% of cases.
+- These differences highlight how real-time inter-brain synchrony reflects varied social cognitive contexts.
+
+---
+
+## License
+
+Licensed under Creative Commons Attribution 4.0 (CC BY 4.0)
+
+---
+
+## Contributor and Contact
+Authors: Axel A. Mendoza-Armenta, Paula Blanco-Téllez, Adaliz G. García-Alcántar, Ivet Ceballos-González, María A. Hernández-Mustieles, Ricardo A. Ramírez-Mendoza, Jorge de J. Lozoya-Santos, Mauricio A. Ramírez-Moreno.
+
+Repository maintained by: Axel Mendoza – feel free to open issues or pull requests!
+
+For questions or collaborations, reach out via GitHub or email: axelmendoza47@live.com.mx
+
+---
+
 ##  Citation
 
 If you use or build on this software, please cite the original paper:
