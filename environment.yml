@@ -1,0 +1,22 @@
+name: b2b_synchrony_env
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Core Python version
+  - python=3.10
+
+  # Scientific & data packages
+  - numpy>=1.24
+  - scipy>=1.10
+  - pandas>=2.0
+  - matplotlib>=3.7
+
+  # Parallelization and utilities
+  - colorama
+  - pip
+
+  # Packages installed from pip (not conda)
+  - pip:
+      - brainflow>=5.10.0    # EEG device SDK

@@ -48,15 +48,22 @@ Versatile use cases: Designed for neuroeducation, but easily adaptable to classr
 
 ## Installation
 
-git clone https://github.com/<your_username>/<your_repo>.git
-cd <your_repo>
+git clone https://github.com/Amisaday74/REAL-TIME-B2B-.git
+cd REAL-TIME-B2B-
+
+Setting environemnt in mac or linux:
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
+Setting envionrment in windows:
+python3 -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+
 Optionally, if using conda:
 conda env create -f environment.yml
-conda activate <env_name>
+conda activate b2b_synchrony_env
 
 ---
 

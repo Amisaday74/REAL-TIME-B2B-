@@ -3,7 +3,7 @@
   "test_duration_seconds": 20,
   "timewindow_seconds": 4,
   "reference_channels": ["CH1", "CH2"],
-  "experiment_phase": "interaction",
+  "experiment_phase": "calibration",
   "devices": [
     {
       "device_id": 1,
