@@ -13,14 +13,15 @@ This repository hosts a Python-based real-time algorithm that estimates brain-to
 
 ## Features
 
-Real-time EEG preprocessing: including filtering and artifact handling via Python.
-Bispectrum-based synchrony estimation: efficient inter-brain coupling metric using bispectrum analysis.
-Multiprocessing support: enables concurrent real-time processing of signals from two EEG sources.
+- Real-time EEG preprocessing: including filtering and artifact handling via Python.
+- Bispectrum-based synchrony estimation: efficient inter-brain coupling metric using bispectrum analysis.
+- Multiprocessing support: enables concurrent real-time processing of signals from two EEG sources.
+
 Application contexts:
-Collaborative tasks (e.g., puzzle solving)—demonstrated to yield significantly higher B2B synchrony.
-Competitive tasks (e.g., one-on-one games)—provides a meaningful comparison benchmark.
-Statistical validation: detrends differences using a Wilcoxon rank-sum test; 33.75% of comparisons achieved statistical significance.
-Versatile use cases: Designed for neuroeducation, but easily adaptable to classrooms, industry, and varied EEG hardware setups.
+- Collaborative tasks (e.g., puzzle solving)—demonstrated to yield significantly higher B2B synchrony.
+- Competitive tasks (e.g., one-on-one games)—provides a meaningful comparison benchmark.
+- Statistical validation: detrends differences using a Wilcoxon rank-sum test; 33.75% of comparisons achieved statistical significance.
+- Versatile use cases: Designed for neuroeducation, but easily adaptable to classrooms, industry, and varied EEG hardware setups.
 
 ---
 
@@ -48,38 +49,39 @@ Versatile use cases: Designed for neuroeducation, but easily adaptable to classr
 
 ## Installation
 
-git clone https://github.com/Amisaday74/REAL-TIME-B2B-.git
-cd REAL-TIME-B2B-
+1. git clone https://github.com/Amisaday74/REAL-TIME-B2B-.git
+2. cd REAL-TIME-B2B-
 
-Setting environemnt in mac or linux:
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+- Setting a environemnt in mac or linux:
+> python3 -m venv venv
+> source venv/bin/activate
+> pip install -r requirements.txt
 
-Setting envionrment in windows:
-python3 -m venv venv
-.\venv\Scripts\activate
-pip install -r requirements.txt
+- Setting a envionrment in windows:
+> python -m venv venv
+> .\venv\Scripts\activate
+> pip install -r requirements.txt
 
-Optionally, if using conda:
-conda env create -f environment.yml
-conda activate b2b_synchrony_env
+- Optionally, if using conda:
+> conda env create -f environment.yml
+> conda activate b2b_synchrony_env
 
 ---
 
 ## Usage
 
 In config.json you will find up the varaibles to adapt the execution of the algorithm to your necessitites
-  "board_id"                - Writte here the name of any of the available boards in Brainflow: https://brainflow.readthedocs.io/en/stable/SupportedBoards.html
-  "test_duration_seconds"   - Duration in seconds of your experiment. This is the total time that the algorith will be operating.
-  "timewindow_seconds"      - Duration in seconds of every timewindow. This number must be a multiple of "test_duration_seconds" to avoid missalignments and lost data.
-  "reference_channels"      - A list containing all the channels that must be considered as reference. The script will calculate the average of all the selected channels
-  "experiment_phase"        - Variable to select the mode of execution. Either calibration or interaction
-  "devices"                 - A dictionary with relevant data for both devices intended to be connected
+-  "board_id"                - Writte here the name of any of the available boards in Brainflow: https://brainflow.readthedocs.io/en/stable/SupportedBoards.html
+-  "test_duration_seconds"   - Duration in seconds of your experiment. This is the total time that the algorith will be operating.
+-  "timewindow_seconds"      - Duration in seconds of every timewindow. This number must be a multiple of "test_duration_seconds" to avoid missalignments and lost data.
+-  "reference_channels"      - A list containing all the channels that must be considered as reference. The script will calculate the average of all the selected channels
+-  "experiment_phase"        - Variable to select the mode of execution. Either calibration or interaction
+-  "devices"                 - A dictionary with relevant data for both devices intended to be connected
 
 # Example: Calibration mode
 If it's your first time running the algorithm ever, you always need to run first a session with "experiment_phase" setted as "calibration", this is what will allow to have a database for future records.
 In this example config.json is adapted to extract data from the ENOPHONES every four seconds for one minute in "calibration" mode.
+
 {
   "board_id": "ENOPHONE_BOARD",   
   "test_duration_seconds": 60,
@@ -107,10 +109,11 @@ Inside the script logic, everytime run_RT_B2B_v3.py is running, the user is aske
 
 > terminal: Please write the assigned number for the dyad under analysis:  <---- Write here an integer
 
-The experimetal design of this algorithm is suited to assign a number for every dyad, this is what will keep different adn well organized folders for every pair of subjects inside the folder "experimental_results". You can rerun the algorithm with the same "experiment_phase" and integer input to overwritte "calibration" results for the same dyad.
+The experimetal design of this algorithm is suited to assign a number for every dyad, this is what will keep different and well organized folders for every pair of subjects inside the folder "experimental_results". You can rerun the algorithm with the same "experiment_phase" and integer input to overwritte "calibration" results for the same dyad.
 
 # Example: Interaction mode
 Once calibration data is stored, the script is ready to record as many experimental sessions as needed. For example, in case you need to estimate brain-to-brain synchrony in a 10 minutes interactive session, keep the same value in "timewindow_seconds" as the one selected in calibration mode and write the number of seconds you would like to record data in "test_duration_seconds". After that set "experiment_phase" as "interaction".
+
 {
   "board_id": "ENOHONE_BOARD",   
   "test_duration_seconds": 600,
@@ -156,22 +159,22 @@ Collected data in real-time is stored in the following subfolders:
 │           └── Real_time_data    
 
 In "calibration" mode, the Bispectrum folder stores the following files:
-Calibration_data.csv      - Main bispectrum results       
-Nested_loops.csv          - Data arrange to calculate mean bispectrum
-Mean.csv                  - Final mean matrix of bisprectrum results
+1. Calibration_data.csv      - Main bispectrum results       
+2. Nested_loops.csv          - Data arrange to calculate mean bispectrum
+3. Mean.csv                  - Final mean matrix of bisprectrum results
 
 In "interaction" mode, the Bispectrum folder stores the following files:
-Interaction_data.csv               - Main bispectrum results       
-Frequency_bands_bispectrum.csv     - Average normalized bisprectum per timewindow grouped by frequency bands
+1. Interaction_data.csv               - Main bispectrum results       
+2. Frequency_bands_bispectrum.csv     - Average normalized bisprectum per timewindow grouped by frequency bands
 
-Data contained inside Real_time_data
-Device_1_raw_data                  - Raw EEG from subject 1 (samples x channels) + Timestamps column
-Device_1_signal_processing         - Preprocessed EEG signal from subject 1 (samples x channels)
-Device_2_raw_data                  - Raw EEG from subject 2 (samples x channels) + Timestamps column
-Device_2_signal_processing         - Preprocessed EEG signal from subject 2 (samples x channels)
+Data contained inside Real_time_data:
+1. Device_1_raw_data                  - Raw EEG from subject 1 (samples x channels) + Timestamps column
+2. Device_1_signal_processing         - Preprocessed EEG signal from subject 1 (samples x channels)
+3. Device_2_raw_data                  - Raw EEG from subject 2 (samples x channels) + Timestamps column
+4. Device_2_signal_processing         - Preprocessed EEG signal from subject 2 (samples x channels)
 
-Data contained inside Figures
-Offline plotting of Frequency_bands_bispectrum.csv
+Data contained inside Figures:
+- Offline plotting of Frequency_bands_bispectrum.csv
 
 Results from the pusblished article can be found at branch "rel/B2B_algorithm_v1". 
 - Collaborative (puzzle-solving) tasks consistently produced higher bispectral synchrony than competitive ones.
@@ -182,7 +185,7 @@ Results from the pusblished article can be found at branch "rel/B2B_algorithm_v1
 
 ## License
 
-Licensed under Creative Commons Attribution 4.0 (CC BY 4.0)
+Licensed under Creative Commons Attribution 1.0
 
 ---
 
