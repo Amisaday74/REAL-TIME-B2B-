@@ -54,16 +54,21 @@ Application contexts:
 
 - Setting a environemnt in mac or linux:
 > python3 -m venv venv
+
 > source venv/bin/activate
+
 > pip install -r requirements.txt
 
 - Setting a envionrment in windows:
 > python -m venv venv
+
 > .\venv\Scripts\activate
+
 > pip install -r requirements.txt
 
 - Optionally, if using conda:
 > conda env create -f environment.yml
+
 > conda activate b2b_synchrony_env
 
 ---
