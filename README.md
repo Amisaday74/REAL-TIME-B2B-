@@ -13,15 +13,15 @@ This repository hosts a Python-based real-time algorithm that estimates brain-to
 
 ## Features
 
-- Real-time EEG preprocessing: including filtering and artifact handling via Python.
+- Real-time EEG preprocessing: includes filtering and artifact handling via Python.
 - Bispectrum-based synchrony estimation: efficient inter-brain coupling metric using bispectrum analysis.
 - Multiprocessing support: enables concurrent real-time processing of signals from two EEG sources.
 
 Application contexts:
 - Collaborative tasks (e.g., puzzle solving)—demonstrated to yield significantly higher B2B synchrony.
-- Competitive tasks (e.g., one-on-one games)—provides a meaningful comparison benchmark.
-- Statistical validation: detrends differences using a Wilcoxon rank-sum test; 33.75% of comparisons achieved statistical significance.
-- Versatile use cases: Designed for neuroeducation, but easily adaptable to classrooms, industry, and varied EEG hardware setups.
+- Competitive tasks (e.g., one-on-one games)—provide a meaningful comparison benchmark.
+- Statistical validation: determines differences using a Wilcoxon rank-sum test; 33.75% of comparisons achieved statistical significance.
+- Versatile use cases: designed for neuroeducation, but easily adaptable to classrooms, industry, and varied EEG hardware setups.
 
 ---
 
@@ -49,24 +49,24 @@ Application contexts:
 
 ## Installation
 
-1. git clone https://github.com/Amisaday74/REAL-TIME-B2B-.git
+1. git clone https://github.com/Amisaday74/REAL-TIME-B2B-.git  
 2. cd REAL-TIME-B2B-
 
-- Setting a environemnt in mac or linux:
+- Setting up an environment on macOS or Linux:
 > python3 -m venv venv
 
 > source venv/bin/activate
 
 > pip install -r requirements.txt
 
-- Setting a envionrment in windows:
+- Setting up an environment on Windows:
 > python -m venv venv
 
 > .\venv\Scripts\activate
 
 > pip install -r requirements.txt
 
-- Optionally, if using conda:
+- Optionally, if using Conda:
 > conda env create -f environment.yml
 
 > conda activate b2b_synchrony_env
@@ -83,9 +83,20 @@ In config.json you will find up the varaibles to adapt the execution of the algo
 -  "experiment_phase"        - Variable to select the mode of execution. Either calibration or interaction
 -  "devices"                 - A dictionary with relevant data for both devices intended to be connected
 
+In `config.json` you will find the variables required to adapt the execution of the algorithm to your needs.
+
+- `"board_id"`                - Write here the name of any of the available boards in BrainFlow: https://brainflow.readthedocs.io/en/stable/SupportedBoards.html
+- `"test_duration_seconds"`   - Duration of the experiment in seconds. This is the total time that the algorithm will be operating.
+- `"timewindow_seconds"`      - Duration in seconds of each time window. This number must be a divisor of `"test_duration_seconds"` to avoid misalignments and lost data.
+- `"reference_channels"`      - A list containing all channels that must be considered as references. The script will calculate the average of all selected channels.
+- `"experiment_phase"`        - Variable used to select the execution mode: either calibration or interaction.
+- `"devices"`                 - A dictionary containing relevant data for both devices intended to be connected.
+
 # Example: Calibration mode
-If it's your first time running the algorithm ever, you always need to run first a session with "experiment_phase" setted as "calibration", this is what will allow to have a database for future records.
-In this example config.json is adapted to extract data from the ENOPHONES every four seconds for one minute in "calibration" mode.
+
+If it is your first time running the algorithm, you must first execute a session with `"experiment_phase"` set to `"calibration"`. This will create the baseline database required for future recordings.
+
+In this example, `config.json` is configured to extract data from the ENOPHONES every four seconds for one minute in `"calibration"` mode.
 
 {
   "board_id": "ENOPHONE_BOARD",   
@@ -109,15 +120,15 @@ In this example config.json is adapted to extract data from the ENOPHONES every 
   ]
 }
 
-After saving your specific configuration, execute run_RT_B2B_v3.py to store calibration data for the first time. 
-Inside the script logic, everytime run_RT_B2B_v3.py is running, the user is asked for one input:
+After saving your specific configuration, execute run_RT_B2B_v3.py to store calibration data for the first time.
+Inside the script logic, every time run_RT_B2B_v3.py is executed, the user is asked for one input:
 
 > terminal: Please write the assigned number for the dyad under analysis:  <---- Write here an integer
 
-The experimetal design of this algorithm is suited to assign a number for every dyad, this is what will keep different and well organized folders for every pair of subjects inside the folder "experimental_results". You can rerun the algorithm with the same "experiment_phase" and integer input to overwritte "calibration" results for the same dyad.
+The experimental design of this algorithm assigns a unique number to every dyad. This keeps separate and well-organized folders for every pair of subjects inside the experimental_results directory. You can rerun the algorithm with the same "experiment_phase" and integer input to overwrite calibration results for the same dyad.
 
 # Example: Interaction mode
-Once calibration data is stored, the script is ready to record as many experimental sessions as needed. For example, in case you need to estimate brain-to-brain synchrony in a 10 minutes interactive session, keep the same value in "timewindow_seconds" as the one selected in calibration mode and write the number of seconds you would like to record data in "test_duration_seconds". After that set "experiment_phase" as "interaction".
+Once calibration data has been stored, the script is ready to record as many experimental sessions as needed. For example, if you need to estimate brain-to-brain synchrony during a 10-minute interactive session, keep the same value for "timewindow_seconds" selected during calibration mode and set the desired recording duration in "test_duration_seconds". Then set "experiment_phase" to "interaction".
 
 {
   "board_id": "ENOHONE_BOARD",   
@@ -141,13 +152,13 @@ Once calibration data is stored, the script is ready to record as many experimen
   ]
 }
 
-Execute run_RT_B2B_v3.py to start the analysis as many times you want. This time, the script will ask for two inputs at the beggining:
+Execute run_RT_B2B_v3.py to start the analysis as many times as needed. This time, the script will ask for two inputs at the beginning:
 
 > terminal: Please write the assigned number for the dyad under analysis:  <---- Write here an integer
 
 > terminal: Enter the iteration number of the current experimental test:  <---- Write here an integer
 
-Keep writting the same number for the dyad being analyzed in the first input. Start writting 1 in the second input and increment this number by one everytime you start a new record session.
+Keep writing the same number for the dyad being analyzed in the first input. Start by writing 1 in the second input and increment this value by one every time you start a new recording session.
 
 ---
 
@@ -165,7 +176,7 @@ Collected data in real-time is stored in the following subfolders:
 
 In "calibration" mode, the Bispectrum folder stores the following files:
 1. Calibration_data.csv      - Main bispectrum results       
-2. Nested_loops.csv          - Data arrange to calculate mean bispectrum
+2. Nested_loops.csv          - Data arranged to calculate mean bispectrum
 3. Mean.csv                  - Final mean matrix of bisprectrum results
 
 In "interaction" mode, the Bispectrum folder stores the following files:
@@ -181,7 +192,7 @@ Data contained inside Real_time_data:
 Data contained inside Figures:
 - Offline plotting of Frequency_bands_bispectrum.csv
 
-Results from the pusblished article can be found at branch "rel/B2B_algorithm_v1". 
+Results from the pusblished article can be found in branch "rel/B2B_algorithm_v1". 
 - Collaborative (puzzle-solving) tasks consistently produced higher bispectral synchrony than competitive ones.
 - A Wilcoxon rank-sum test confirmed statistical significance in ~33.75% of cases.
 - These differences highlight how real-time inter-brain synchrony reflects varied social cognitive contexts.

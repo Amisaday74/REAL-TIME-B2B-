@@ -1,0 +1,81 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the repository and the associated publication."
+title: "Real-Time Brain-to-Brain Synchrony Estimation Algorithm"
+version: 0.1.0
+date-released: 2026-04-28
+
+authors:
+  - family-names: "Mendoza-Armenta"
+    given-names: "Axel A."
+    email: "axelmendoza47@live.com.mx"
+
+  - family-names: "Blanco-Téllez"
+    given-names: "Paula"
+
+  - family-names: "García-Alcántar"
+    given-names: "Adaliz G."
+
+  - family-names: "Ceballos-González"
+    given-names: "Ivet"
+
+  - family-names: "Hernández-Mustieles"
+    given-names: "María A."
+
+  - family-names: "Ramírez-Mendoza"
+    given-names: "Ricardo A."
+
+  - family-names: "Lozoya-Santos"
+    given-names: "Jorge de J."
+
+  - family-names: "Ramírez-Moreno"
+    given-names: "Mauricio A."
+
+repository-code: "https://github.com/Amisaday74/REAL-TIME-B2B-"
+url: "https://github.com/Amisaday74/REAL-TIME-B2B-"
+license: "CC-BY-4.0"
+
+keywords:
+  - EEG
+  - Brain-to-Brain Synchrony
+  - Bispectrum
+  - Neuroeducation
+  - BrainFlow
+  - Real-Time Processing
+  - Hyperscanning
+  - Neuroengineering
+  - Multiprocessing
+
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Mendoza-Armenta"
+      given-names: "Axel A."
+
+    - family-names: "Blanco-Téllez"
+      given-names: "Paula"
+
+    - family-names: "García-Alcántar"
+      given-names: "Adaliz G."
+
+    - family-names: "Ceballos-González"
+      given-names: "Ivet"
+
+    - family-names: "Hernández-Mustieles"
+      given-names: "María A."
+
+    - family-names: "Ramírez-Mendoza"
+      given-names: "Ricardo A."
+
+    - family-names: "Lozoya-Santos"
+      given-names: "Jorge de J."
+
+    - family-names: "Ramírez-Moreno"
+      given-names: "Mauricio A."
+
+  title: "Implementation of a Real-Time Brain-to-Brain Synchrony Estimation Algorithm for Neuroeducation Applications"
+  journal: "Sensors"
+  year: 2024
+  volume: 24
+  issue: 6
+  pages: 1776
+  doi: "10.3390/s24061776"
