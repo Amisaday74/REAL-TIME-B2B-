@@ -113,6 +113,7 @@ In this example, `config.json` is configured to extract data from the ENOPHONES 
     }
   ]
 }
+```
 
 After saving your specific configuration, execute `"run_RT_B2B_v3.py"` to store calibration data for the first time.
 Inside the script logic, every time `"run_RT_B2B_v3.py"` is executed, the user is asked for one input:
@@ -124,6 +125,7 @@ The experimental design of this algorithm assigns a unique number to every dyad.
 # Example: Interaction mode
 Once calibration data has been stored, the script is ready to record as many experimental sessions as needed. For example, if you need to estimate brain-to-brain synchrony during a 10-minute interactive session, keep the same value for "timewindow_seconds" selected during calibration mode and set the desired recording duration in "test_duration_seconds". Then set "experiment_phase" to "interaction".
 
+```json
 {
   "board_id": "ENOHONE_BOARD",   
   "test_duration_seconds": 600,
@@ -145,6 +147,7 @@ Once calibration data has been stored, the script is ready to record as many exp
     }
   ]
 }
+```
 
 Execute `"run_RT_B2B_v3.py"` to start the analysis as many times as needed. This time, the script will ask for two inputs at the beginning:
 
