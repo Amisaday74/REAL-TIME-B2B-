@@ -27,22 +27,22 @@ Application contexts:
 
 ## Repository Structure
 
-├── brain2brain_sync/        # Python module containing core logic
-│   ├── __init__.py
-│   ├── EEG_device.py        # connection, filters, EEG timewindows handling
-│   ├── bispectrum.py        # bispectrum extraction logic
-│   ├── graphs.py            # real-time data graphs
-│   └── stopwatch.py         # counter for master control
-├── experimental_resuts      # Folder created during runtime execution to store data (local)
-├── tests/
-│   └── test_bispectrum.py   # Unit tests module
-├── config.json              # File containing editable data to setup the experiment
-├── run_RT_B2B_v3.py         # Main script to run the experiment using multiprocessing
-├── requirements.txt         # Dependencies for reproducibility
-├── environment.yml          # (Optional) conda environment spec
-├── LICENSE                  # CC (Creative Commons) 
-├── README.md                # This file
-├── CITATION.cff             # Citation file for GitHub integration
+├── brain2brain_sync/        # Python module containing core logic  
+│   ├── __init__.py  
+│   ├── EEG_device.py        # Connection, filtering, and EEG time-window handling  
+│   ├── bispectrum.py        # Bispectrum extraction logic  
+│   ├── graphs.py            # Real-time data graphs  
+│   └── stopwatch.py         # Counter for master control  
+├── experimental_results     # Folder created during runtime execution to store data (local)  
+├── tests/  
+│   └── test_bispectrum.py   # Unit testing module  
+├── config.json              # File containing editable parameters to configure the experiment  
+├── run_RT_B2B_v3.py         # Main script to run the experiment using multiprocessing  
+├── requirements.txt         # Dependencies for reproducibility  
+├── environment.yml          # (Optional) Conda environment specification  
+├── LICENSE                  # CC (Creative Commons)  
+├── README.md                # This file  
+├── CITATION.cff             # Citation file for GitHub integration  
 └── .gitignore
 
 ---
@@ -75,13 +75,6 @@ Application contexts:
 
 ## Usage
 
-In config.json you will find up the varaibles to adapt the execution of the algorithm to your necessitites
--  "board_id"                - Writte here the name of any of the available boards in Brainflow: https://brainflow.readthedocs.io/en/stable/SupportedBoards.html
--  "test_duration_seconds"   - Duration in seconds of your experiment. This is the total time that the algorith will be operating.
--  "timewindow_seconds"      - Duration in seconds of every timewindow. This number must be a multiple of "test_duration_seconds" to avoid missalignments and lost data.
--  "reference_channels"      - A list containing all the channels that must be considered as reference. The script will calculate the average of all the selected channels
--  "experiment_phase"        - Variable to select the mode of execution. Either calibration or interaction
--  "devices"                 - A dictionary with relevant data for both devices intended to be connected
 
 In `config.json` you will find the variables required to adapt the execution of the algorithm to your needs.
 
@@ -98,6 +91,7 @@ If it is your first time running the algorithm, you must first execute a session
 
 In this example, `config.json` is configured to extract data from the ENOPHONES every four seconds for one minute in `"calibration"` mode.
 
+```json
 {
   "board_id": "ENOPHONE_BOARD",   
   "test_duration_seconds": 60,
@@ -120,8 +114,8 @@ In this example, `config.json` is configured to extract data from the ENOPHONES 
   ]
 }
 
-After saving your specific configuration, execute run_RT_B2B_v3.py to store calibration data for the first time.
-Inside the script logic, every time run_RT_B2B_v3.py is executed, the user is asked for one input:
+After saving your specific configuration, execute `"run_RT_B2B_v3.py"` to store calibration data for the first time.
+Inside the script logic, every time `"run_RT_B2B_v3.py"` is executed, the user is asked for one input:
 
 > terminal: Please write the assigned number for the dyad under analysis:  <---- Write here an integer
 
@@ -152,7 +146,7 @@ Once calibration data has been stored, the script is ready to record as many exp
   ]
 }
 
-Execute run_RT_B2B_v3.py to start the analysis as many times as needed. This time, the script will ask for two inputs at the beginning:
+Execute `"run_RT_B2B_v3.py"` to start the analysis as many times as needed. This time, the script will ask for two inputs at the beginning:
 
 > terminal: Please write the assigned number for the dyad under analysis:  <---- Write here an integer
 
