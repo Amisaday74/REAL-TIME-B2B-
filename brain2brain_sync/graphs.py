@@ -6,11 +6,41 @@ import time
 import numpy as np
 
 # ------------------- Graph Class with QThread ------------------- #
+#
+# BUFFERED CHUNK-PLOTTING MECHANISM — HOW IT WORKS
+# ─────────────────────────────────────────────────
+# EEG_device.py collects data in fixed time windows (e.g. timewindow_seconds = 4 s).
+# At the end of each window it emits a NumPy block of shape [channels, sampling_rate * timewindow_seconds]
+# to this Graph via update_plot() / update_processed().
+#
+# Rather than drawing the full 4-second block in one jump — which would look like the
+# trace snapping forward abruptly — the graph stores the incoming block in an internal
+# buffer and replays it in smaller slices called *chunks*:
+#
+#   chunk_interval_seconds  →  how many seconds of data each tick renders
+#   chunk_size              →  samples per chunk = sampling_rate × chunk_interval_seconds
+#   _chunk_timer interval   →  fires every chunk_interval_seconds (in ms)
+#
+# Example  (timewindow = 4 s, chunk_interval = 1 s, sampling_rate = 250 Hz):
+#   • EEG_device sends 1000-sample block every 4 s.
+#   • _chunk_timer fires every 1 s and draws 250 samples per tick → 4 ticks to drain the buffer.
+#   • Result: the display scrolls forward smoothly in 1-second steps.
+#
+# CONSTRAINT: timewindow_seconds must be an integer multiple of chunk_interval_seconds
+# so that every incoming block is divided into a whole number of chunks with no remainder.
+# Valid chunk_interval values for a 4-second window: 0.5 s, 1 s, 2 s, 4 s.
+#
+# INHERENT DISPLAY DELAY:
+#   Because EEG_device waits for a complete time window before emitting data, the earliest
+#   moment the graph can start drawing a window is when that window has fully elapsed.
+#   The display therefore always lags behind live EEG by ~timewindow_seconds.  This is a
+#   fundamental trade-off of window-based processing, not a bug.
+# ─────────────────────────────────────────────────
 class Graph(QtCore.QThread):
     data_signal = QtCore.pyqtSignal(object)  # Signal to receive raw data
     processed_data = QtCore.pyqtSignal(object)  # Signal to receive processed data
 
-    def __init__(self, eeg_channels, sampling_rate, title="Real-Time EEG Data"):
+    def __init__(self, eeg_channels, sampling_rate, title="Real-Time EEG Data", chunk_interval_seconds=1):
         super().__init__()
         self.eeg_channels = eeg_channels
         self.sampling_rate = sampling_rate
@@ -22,11 +52,17 @@ class Graph(QtCore.QThread):
         self.buffer_processed = None
         # index (in samples) for chunked plotting
         self.buffer_idx = 0
-        # number of samples per 1-second chunk
-        self.chunk_size = int(self.sampling_rate)
-        # Timer to drive per-second chunk plotting
+        # ── Chunk-interval configuration ──────────────────────────────────────────────
+        # chunk_interval_seconds controls how finely the incoming data block is sliced
+        # for display.  Smaller values produce smoother scrolling at the cost of more
+        # frequent Qt redraws; larger values reduce CPU load but make updates more steppy.
+        # Must evenly divide timewindow_seconds (validated in run_RT_B2B_v3.py).
+        self.chunk_interval_seconds = chunk_interval_seconds
+        # Number of samples rendered per timer tick
+        self.chunk_size = int(self.sampling_rate * chunk_interval_seconds)
+        # Qt timer that fires once per chunk_interval to advance the display
         self._chunk_timer = QtCore.QTimer()
-        self._chunk_timer.setInterval(1000)
+        self._chunk_timer.setInterval(int(chunk_interval_seconds * 1000))
         self._chunk_timer.timeout.connect(self._on_chunk_timer)
 
         # Initialize the application and plot window
@@ -122,7 +158,12 @@ class Graph(QtCore.QThread):
         QtWidgets.QApplication.processEvents()
 
     def _on_chunk_timer(self):
-        """Called every second to plot the next chunk from the buffered data."""
+        """Fires every chunk_interval_seconds to advance the display by one chunk.
+
+        Reads the next chunk_size samples from the internal buffers and pushes
+        them to the plot curves.  When both buffers have been fully drained the
+        timer stops until new data arrives via update_plot / update_processed.
+        """
         plotted_any = False
 
         # Prefer processed buffer for processed plots, raw for raw plots; both may exist
@@ -225,20 +266,25 @@ class Graph(QtCore.QThread):
         return super().eventFilter(obj, event)
 # ------------------- Main Data Collection Loop ------------------- #
 def main():
+    import json
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+
     BoardShim.enable_dev_board_logger()
     params = BrainFlowInputParams()
     board_id = BoardIds.SYNTHETIC_BOARD.value  # Replace with your board ID
     eeg_channels = BoardShim.get_eeg_channels(board_id)
     sampling_rate = BoardShim.get_sampling_rate(board_id)
     board = BoardShim(board_id, params)
-    
+    chunk_interval = config.get('chunk_interval_seconds', 1)
+
     # Start Board Session
     board.prepare_session()
     board.start_stream(45000)
     print('---- Starting the EEG Data Streaming ----')
 
     # Initialize the Graph in a separate thread
-    graph = Graph(eeg_channels, sampling_rate)
+    graph = Graph(eeg_channels, sampling_rate, chunk_interval_seconds=chunk_interval)
 
     while True:
         time.sleep(1)  # 4-second window

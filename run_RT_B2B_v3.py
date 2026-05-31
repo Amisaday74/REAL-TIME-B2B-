@@ -41,6 +41,7 @@ eeg_channels = BoardShim.get_eeg_channels(board_id)
 sampling_rate = BoardShim.get_sampling_rate(board_id)
 test_duration = config['test_duration_seconds']
 timewindow = config['timewindow_seconds']
+chunk_interval = config.get('chunk_interval_seconds', 1)
 experiment_phase = config['experiment_phase']
 reference_channels = config['reference_channels']
 
@@ -48,6 +49,14 @@ reference_channels = config['reference_channels']
 if test_duration % timewindow != 0:
     print(Fore.RED + f"Error: test_duration ({test_duration}s) must be a multiple of timewindow ({timewindow}s)." + Style.RESET_ALL)
     print(f"Valid combinations: timewindow={timewindow}s → test_duration can be {timewindow}, {timewindow*2}, {timewindow*3}, {timewindow*4}, {timewindow*5}, ...")
+    sys.exit(1)
+
+# Validate that timewindow is a multiple of chunk_interval so every data block
+# divides into a whole number of display chunks with no leftover samples.
+if timewindow % chunk_interval != 0:
+    print(Fore.RED + f"Error: timewindow ({timewindow}s) must be a multiple of chunk_interval_seconds ({chunk_interval}s)." + Style.RESET_ALL)
+    valid = [timewindow / d for d in range(1, timewindow + 1) if timewindow % d == 0]
+    print(f"Valid chunk_interval values for timewindow={timewindow}s: {valid}")
     sys.exit(1)
 
 def poll_queues(graph1, graph2, queues, device_1_name, device_2_name):
@@ -178,8 +187,8 @@ if __name__ == '__main__':
     # Qt GUI runs in main thread (no warning, responsive)
     # -----------------------------------------------------------
     app = QtWidgets.QApplication(sys.argv)
-    graph1 = Graph(eeg_channels, sampling_rate, "Device 1 EEG Data")
-    graph2 = Graph(eeg_channels, sampling_rate, "Device 2 EEG Data")
+    graph1 = Graph(eeg_channels, sampling_rate, "Device 1 EEG Data", chunk_interval_seconds=chunk_interval)
+    graph2 = Graph(eeg_channels, sampling_rate, "Device 2 EEG Data", chunk_interval_seconds=chunk_interval)
 
     # Poll incoming data from queues every 100 ms
     q_timer = QtCore.QTimer()

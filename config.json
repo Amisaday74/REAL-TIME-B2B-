@@ -2,8 +2,9 @@
   "board_id": "SYNTHETIC_BOARD",
   "test_duration_seconds": 20,
   "timewindow_seconds": 4,
+  "chunk_interval_seconds": 1,
   "reference_channels": ["CH1", "CH2"],
-  "experiment_phase": "calibration",
+  "experiment_phase": "interaction",
   "devices": [
     {
       "device_id": 1,
