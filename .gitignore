@@ -1,3 +1,4 @@
 experimental_results/
+venv/
 
 __pycache__/

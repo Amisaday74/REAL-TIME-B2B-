@@ -3,6 +3,7 @@ import pyqtgraph as pg
 from brainflow import BoardShim, DataFilter, DetrendOperations
 from brainflow.board_shim import BrainFlowInputParams, BoardIds
 import time
+import numpy as np
 
 # ------------------- Graph Class with QThread ------------------- #
 class Graph(QtCore.QThread):
@@ -16,6 +17,17 @@ class Graph(QtCore.QThread):
         self.window_size = 4
         self.num_points = self.window_size * self.sampling_rate
         self.running = True
+        # Buffers to hold the latest emitted block(s). They store numpy arrays shape [channels, n_samples]
+        self.buffer_raw = None
+        self.buffer_processed = None
+        # index (in samples) for chunked plotting
+        self.buffer_idx = 0
+        # number of samples per 1-second chunk
+        self.chunk_size = int(self.sampling_rate)
+        # Timer to drive per-second chunk plotting
+        self._chunk_timer = QtCore.QTimer()
+        self._chunk_timer.setInterval(1000)
+        self._chunk_timer.timeout.connect(self._on_chunk_timer)
 
         # Initialize the application and plot window
         self.win = pg.GraphicsLayoutWidget(show=True, title=title)
@@ -72,16 +84,91 @@ class Graph(QtCore.QThread):
     @QtCore.pyqtSlot(object)
     def update_plot(self, data):
         """Update plot with new data."""
-        for count, channel in enumerate(self.eeg_channels):
-            self.curves[count].setData(data[channel].tolist())
+        # Accept numpy arrays with shape [channels, n_samples]
+        try:
+            arr = np.array(data)
+        except Exception:
+            return
+
+        # If there's already buffered data, concatenate along time axis
+        if self.buffer_raw is None:
+            self.buffer_raw = arr.copy()
+            self.buffer_idx = 0
+        else:
+            # concat along axis=1 (time)
+            self.buffer_raw = np.concatenate((self.buffer_raw, arr), axis=1)
+
+        # Start (or keep) chunk timer to plot every second
+        if not self._chunk_timer.isActive():
+            self._chunk_timer.start()
         QtWidgets.QApplication.processEvents()
 
     @QtCore.pyqtSlot(object)
     def update_processed(self, data):
         """Update plot with processed data."""
-        for count, channel in enumerate(self.eeg_channels):
-            self.curves2[count].setData(data[channel].tolist())
+        try:
+            arr = np.array(data)
+        except Exception:
+            return
+
+        if self.buffer_processed is None:
+            self.buffer_processed = arr.copy()
+            self.buffer_idx = 0
+        else:
+            self.buffer_processed = np.concatenate((self.buffer_processed, arr), axis=1)
+
+        if not self._chunk_timer.isActive():
+            self._chunk_timer.start()
         QtWidgets.QApplication.processEvents()
+
+    def _on_chunk_timer(self):
+        """Called every second to plot the next chunk from the buffered data."""
+        plotted_any = False
+
+        # Prefer processed buffer for processed plots, raw for raw plots; both may exist
+        if self.buffer_raw is not None:
+            width = self.buffer_raw.shape[1]
+            start = self.buffer_idx
+            end = min(start + self.chunk_size, width)
+            for count, channel in enumerate(self.eeg_channels):
+                try:
+                    y = self.buffer_raw[channel, start:end]
+                except Exception:
+                    # if channel indexing is unexpected, fallback to using count
+                    y = self.buffer_raw[count, start:end]
+                self.curves[count].setData(y.tolist())
+            plotted_any = True
+
+        if self.buffer_processed is not None:
+            width_p = self.buffer_processed.shape[1]
+            start_p = self.buffer_idx
+            end_p = min(start_p + self.chunk_size, width_p)
+            for count, channel in enumerate(self.eeg_channels):
+                try:
+                    y = self.buffer_processed[channel, start_p:end_p]
+                except Exception:
+                    y = self.buffer_processed[count, start_p:end_p]
+                self.curves2[count].setData(y.tolist())
+            plotted_any = True
+
+        if plotted_any:
+            QtWidgets.QApplication.processEvents()
+
+        # Advance index; if both buffers exhausted, stop timer
+        # Use the largest available width to know when to stop
+        max_width = 0
+        if self.buffer_raw is not None:
+            max_width = max(max_width, self.buffer_raw.shape[1])
+        if self.buffer_processed is not None:
+            max_width = max(max_width, self.buffer_processed.shape[1])
+
+        self.buffer_idx += self.chunk_size
+        if self.buffer_idx >= max_width:
+            # finished plotting current buffered data
+            self._chunk_timer.stop()
+            self.buffer_idx = 0
+            self.buffer_raw = None
+            self.buffer_processed = None
         
 
     # -----------------------------------------------------------
@@ -91,6 +178,12 @@ class Graph(QtCore.QThread):
         """Called automatically when the window is closed."""
         print("[Graph] Window closed by user — GUI will stop, acquisition continues.")
         self.running = False
+        # stop chunk timer if running
+        try:
+            if self._chunk_timer.isActive():
+                self._chunk_timer.stop()
+        except Exception:
+            pass
         QtCore.QTimer.singleShot(100, self.app_quit)  # Quit Qt after a short delay
         event.accept()
 
@@ -103,6 +196,11 @@ class Graph(QtCore.QThread):
         if self.running:
             print("[Graph] Close requested programmatically — stopping GUI.")
             self.running = False
+            try:
+                if self._chunk_timer.isActive():
+                    self._chunk_timer.stop()
+            except Exception:
+                pass
             QtCore.QTimer.singleShot(100, self.app_quit)
 
     def app_quit(self):
