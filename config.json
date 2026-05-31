@@ -4,7 +4,7 @@
   "timewindow_seconds": 4,
   "chunk_interval_seconds": 1,
   "reference_channels": ["CH1", "CH2"],
-  "experiment_phase": "interaction",
+  "experiment_phase": "calibration",
   "devices": [
     {
       "device_id": 1,

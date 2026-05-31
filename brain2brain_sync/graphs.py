@@ -60,6 +60,13 @@ class Graph(QtCore.QThread):
         self.chunk_interval_seconds = chunk_interval_seconds
         # Number of samples rendered per timer tick
         self.chunk_size = int(self.sampling_rate * chunk_interval_seconds)
+        # Pre-computed time axis in seconds: always spans 0 → chunk_interval_seconds.
+        # At each timer tick it is offset by _chunk_count * chunk_interval_seconds so
+        # the x-axis advances cumulatively (0→1, 1→2, 2→3 … for 1-second chunks).
+        self._time_axis = np.linspace(0, chunk_interval_seconds, self.chunk_size, endpoint=False)
+        # Counts how many chunks have been rendered in the current plotting cycle.
+        # Used to compute the running time offset for the x-axis.
+        self._chunk_count = 0
         # Qt timer that fires once per chunk_interval to advance the display
         self._chunk_timer = QtCore.QTimer()
         self._chunk_timer.setInterval(int(chunk_interval_seconds * 1000))
@@ -89,11 +96,16 @@ class Graph(QtCore.QThread):
         """Initialize the time series plots for each EEG channel."""
         self.plots = []
         self.curves = []
+        last = len(self.eeg_channels) - 1
         for i in range(len(self.eeg_channels)):
             p = self.win.addPlot(row=i, col=0)
             p.showAxis('left', False)
             p.setMenuEnabled('left', False)
-            p.showAxis('bottom', False)
+            # Show a time-labeled x-axis only on the bottom-most channel plot
+            if i < last:
+                p.showAxis('bottom', False)
+            else:
+                p.getAxis('bottom').setLabel('Time', units='s')
             p.setMenuEnabled('bottom', False)
             if i == 0:
                 p.setTitle('EEG Raw Data')
@@ -105,11 +117,16 @@ class Graph(QtCore.QThread):
     def _init_processed(self):
         self.plots2 = []
         self.curves2 = []
+        last = len(self.eeg_channels) - 1
         for i in range(len(self.eeg_channels)):
             p2 = self.win.addPlot(row=i, col=1)
             p2.showAxis('left', False)
             p2.setMenuEnabled('left', False)
-            p2.showAxis('bottom', False)
+            # Show a time-labeled x-axis only on the bottom-most channel plot
+            if i < last:
+                p2.showAxis('bottom', False)
+            else:
+                p2.getAxis('bottom').setLabel('Time', units='s')
             p2.setMenuEnabled('bottom', False)
             if i == 0:
                 p2.setTitle('Processed Signal')
@@ -166,6 +183,11 @@ class Graph(QtCore.QThread):
         """
         plotted_any = False
 
+        # Cumulative time offset for this tick: advances by chunk_interval_seconds
+        # each time the timer fires, so the x-axis reads 0→1, 1→2, 2→3 … etc.
+        t_offset = self._chunk_count * self.chunk_interval_seconds
+        x_axis = self._time_axis[:self.chunk_size] + t_offset
+
         # Prefer processed buffer for processed plots, raw for raw plots; both may exist
         if self.buffer_raw is not None:
             width = self.buffer_raw.shape[1]
@@ -177,7 +199,8 @@ class Graph(QtCore.QThread):
                 except Exception:
                     # if channel indexing is unexpected, fallback to using count
                     y = self.buffer_raw[count, start:end]
-                self.curves[count].setData(y.tolist())
+                # x-axis: slice to match actual sample count and apply cumulative offset
+                self.curves[count].setData(x=x_axis[:len(y)], y=y)
             plotted_any = True
 
         if self.buffer_processed is not None:
@@ -189,7 +212,7 @@ class Graph(QtCore.QThread):
                     y = self.buffer_processed[channel, start_p:end_p]
                 except Exception:
                     y = self.buffer_processed[count, start_p:end_p]
-                self.curves2[count].setData(y.tolist())
+                self.curves2[count].setData(x=x_axis[:len(y)], y=y)
             plotted_any = True
 
         if plotted_any:
@@ -204,10 +227,12 @@ class Graph(QtCore.QThread):
             max_width = max(max_width, self.buffer_processed.shape[1])
 
         self.buffer_idx += self.chunk_size
+        self._chunk_count += 1
         if self.buffer_idx >= max_width:
             # finished plotting current buffered data
             self._chunk_timer.stop()
             self.buffer_idx = 0
+            self._chunk_count = 0
             self.buffer_raw = None
             self.buffer_processed = None
         
